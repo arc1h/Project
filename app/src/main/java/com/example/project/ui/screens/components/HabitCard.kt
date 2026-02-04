@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import com.example.project.data.model.Habit
 import com.example.project.ui.theme.Purple
 import com.example.project.ui.theme.White
+import androidx.compose.ui.platform.LocalContext
+import com.example.project.data.util.cancelHabitAlarm
 
 @Composable
 fun HabitCard(
@@ -52,6 +54,7 @@ fun HabitCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val cardColor = MaterialTheme.colorScheme.surface
     val textColor = MaterialTheme.colorScheme.onSurface
@@ -67,9 +70,9 @@ fun HabitCard(
             .fillMaxWidth()
             .height(100.dp),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.5.dp, borderColor),
+        border = null,
         colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Row(
             modifier = Modifier
@@ -155,11 +158,12 @@ fun HabitCard(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Habit") },
-            text = { Text("Are you sure you want to delete \"${habit.name}\"? This action cannot be undone.") },
+            text = { Text("Are you sure you want to delete \"${habit.name}\"?") },
             confirmButton = {
                 Button(
                     onClick = {
                         showDeleteDialog = false
+                        cancelHabitAlarm(context, habit.name) // CANCEL ALARM HERE
                         onDelete()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)

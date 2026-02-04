@@ -61,16 +61,25 @@ class HabitViewModel : ViewModel() {
             is Frequency.Daily -> 25
             is Frequency.Weekly -> 50
             is Frequency.Monthly -> 100
-            is Frequency.Yearly -> 200
         }
 
-        firestore.collection("users").document(uid)
-            .collection("habits")
-            .document(habit.id)
-            .update("lastCompleted", now)
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Error marking habit as done", e)
-            }
+        val userRef = firestore.collection("users").document(uid)
+
+        firestore.runTransaction { transaction ->
+            val snapshot = transaction.get(userRef)
+            val currentXp = snapshot.getLong("xp") ?: 0L
+            val newXp = currentXp + xpReward
+
+            // Calculate Level: 1000 XP = Level 1, 2000 XP = Level 2, etc.
+            val newLevel = (newXp / 1000).toInt()
+
+            transaction.update(userRef, "xp", newXp)
+            transaction.update(userRef, "level", newLevel)
+
+            // Update the habit completion
+            val habitRef = userRef.collection("habits").document(habit.id)
+            transaction.update(habitRef, "lastCompleted", now)
+        }
     }
 
     fun addHabit(name: String, frequency: Frequency) {

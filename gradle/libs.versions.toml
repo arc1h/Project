@@ -1,7 +1,7 @@
 [versions]
 activityComposeVersion = "1.9.3"
 agp = "8.7.3"
-firebaseBom = "34.7.0" # As of late 2025 [2]
+firebaseBom = "34.8.0"
 kotlin = "2.2.10"
 coreKtx = "1.17.0"
 junit = "4.13.2"
@@ -13,6 +13,9 @@ composeBom = "2024.09.00"
 material3 = "1.4.0"
 googleGmsServices = "4.4.4"
 roomKtx = "2.8.4"
+foundation = "1.10.2"
+uiText = "1.10.2"
+benchmarkTraceprocessor = "1.4.1"
 
 [libraries]
 androidx-activity-compose-v193 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
@@ -35,7 +38,12 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-common = { group = "com.google.firebase", name = "firebase-common" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version = "2.7.0" }
+androidx-benchmark-traceprocessor = { group = "androidx.benchmark", name = "benchmark-traceprocessor", version.ref = "benchmarkTraceprocessor" }
 
 
 [plugins]

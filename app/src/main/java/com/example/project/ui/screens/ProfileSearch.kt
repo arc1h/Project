@@ -1,6 +1,5 @@
 package com.example.project.ui.screens
 
-import android.R.attr.top
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,7 +70,7 @@ enum class FriendshipStatus {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileSearchScreen(navController: NavController? = null) {
+fun ProfileSearch(navController: NavController? = null) {
     var searchQuery by remember { mutableStateOf("") }
     var allUsers by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var filteredUsers by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
@@ -274,9 +273,8 @@ fun UserProfileCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            containerColor = MaterialTheme.colorScheme.background
+        )
     ) {
         Row(
             modifier = Modifier

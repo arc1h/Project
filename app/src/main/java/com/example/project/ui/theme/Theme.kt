@@ -5,35 +5,52 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
+// Theme modes
+enum class ThemeMode {
+    LIGHT,
+    DARK,
+    SYSTEM
+}
+
+// Light color scheme
+private val LightColors = lightColorScheme(
     primary = Purple,
-    onPrimary = White,
-    background = DarkBackground,
-    surface = DarkBackground,
-    onSurface = White,
-    onBackground = White,
-    outline = DarkGray
+    onPrimary = Color.White,
+    secondary = Purple,
+    background = Color.White,
+    onBackground = Color.Black,
+    surface = Color.White,
+    onSurface = Color.Black,
+    onSurfaceVariant = Color.Gray
 )
 
-private val LightColorScheme = lightColorScheme(
+// Dark color scheme
+private val DarkColors = darkColorScheme(
     primary = Purple,
-    onPrimary = White,
-    background = White,
-    surface = White,
-    onSurface = Black,
-    onBackground = Black,
-    outline = LightGray
+    onPrimary = Color.White,
+    secondary = Purple,
+    background = Color(0xFF121212),
+    onBackground = Color.White,
+    surface = Color(0xFF1E1E1E),
+    onSurface = Color.White,
+    onSurfaceVariant = Color.LightGray
 )
 
 @Composable
 fun ProjectTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // turn off dynamicColor by default so Material You doesn't change colors
-    dynamicColor: Boolean = false,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    // Determine if dark theme should be used
+    val useDarkTheme = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+
+    val colorScheme = if (useDarkTheme) DarkColors else LightColors
 
     MaterialTheme(
         colorScheme = colorScheme,

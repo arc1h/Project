@@ -117,7 +117,8 @@ class HeroViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val newXP = currentHero.xp + amount
-                val newLevel = calculateLevel(newXP)
+                // FIX: Change 'newXp' to 'newXP' to match the line above
+                val newLevel = newXP / 1000
 
                 db.collection("users")
                     .document(userId)
@@ -131,6 +132,7 @@ class HeroViewModel : ViewModel() {
                     )
                     .await()
 
+                // Also update the local state so the UI reflects the change immediately
                 hero.value = currentHero.copy(xp = newXP, level = newLevel)
             } catch (e: Exception) {
                 println("Error adding XP: ${e.message}")

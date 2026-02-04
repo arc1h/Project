@@ -49,7 +49,7 @@ data class FriendRequest(
 )
 
 @Composable
-fun NotificationScreen(navController: NavController? = null) {
+fun Notifications(navController: NavController? = null) {
     var friendRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var refreshTrigger by remember { mutableStateOf(0) }

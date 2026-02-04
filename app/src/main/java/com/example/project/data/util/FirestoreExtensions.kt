@@ -4,13 +4,6 @@ import com.example.project.data.model.Frequency
 import com.example.project.data.model.Habit
 import com.google.firebase.firestore.DocumentSnapshot
 
-/**
- * Extension functions for Firestore conversions
- */
-
-/**
- * Convert a Firestore DocumentSnapshot to a Habit object
- */
 fun DocumentSnapshot.toHabit(): Habit? {
     return try {
         val frequencyString = getString("frequency") ?: "Daily (Every 1 Day)"

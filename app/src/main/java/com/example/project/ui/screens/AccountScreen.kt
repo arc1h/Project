@@ -114,7 +114,7 @@ fun AccountScreen(
                     ) {
                         Text(
                             text = userName,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         IconButton(onClick = { showEditNameDialog = true }) {
@@ -142,14 +142,18 @@ fun AccountScreen(
 
                 AccountMenuItem(
                     text = "Account Details",
-                    onClick = onAccountDetails
+                    onClick = {
+                        navController?.navigate("account_details")
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 AccountMenuItem(
                     text = "App Settings",
-                    onClick = onAppSettings
+                    onClick = {
+                        navController?.navigate("app_settings")
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
