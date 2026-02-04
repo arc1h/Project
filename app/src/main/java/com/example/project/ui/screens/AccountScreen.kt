@@ -100,7 +100,7 @@ fun AccountScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .align(Alignment.Start)
-                        .padding(bottom = 32.dp)
+                        .padding(top = 24.dp, bottom = 32.dp)
                 )
 
                 // Name with edit icon

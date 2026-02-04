@@ -1,6 +1,8 @@
 package com.example.project.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.project.data.viewmodel.HeroViewModel
 import com.example.project.data.viewmodel.UserViewModel
 import com.example.project.ui.screens.AccountScreen
 import com.example.project.ui.screens.HabitsScreen
@@ -33,6 +36,7 @@ import kotlinx.coroutines.delay
 fun AppRoot() {
     val navController = rememberNavController()
     val userViewModel: UserViewModel = viewModel()
+    val heroViewModel: HeroViewModel = viewModel()
     val auth = FirebaseAuth.getInstance()
 
     var showSplash by remember { mutableStateOf(true) }
@@ -75,6 +79,7 @@ fun AppRoot() {
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding()
             )
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
         ) {
             composable(Screen.Login.route) {
                 LoginScreen(
@@ -95,7 +100,7 @@ fun AppRoot() {
             }
 
             composable(Screen.Hero.route) {
-                HeroScreen()
+                HeroScreen(heroViewModel = heroViewModel)
             }
 
             composable(Screen.Account.route) {

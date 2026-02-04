@@ -1,5 +1,6 @@
 package com.example.project.ui.screens
 
+import android.R.attr.top
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -136,9 +137,14 @@ fun ProfileSearchScreen(navController: NavController? = null) {
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Profile Search") },
+                title = { Text(
+                    "Profile Search",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier
+                        .padding(top = 36.dp, bottom = 8.dp)
+                ) },
                 navigationIcon = {
-                    IconButton(onClick = { navController?.navigateUp() }) {
+                    IconButton(onClick = { navController?.navigateUp() }, modifier = Modifier.padding(top = 36.dp, bottom = 8.dp)) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
@@ -164,7 +170,7 @@ fun ProfileSearchScreen(navController: NavController? = null) {
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = 8.dp),
                 placeholder = { Text("Search users...") },
                 leadingIcon = {
                     Icon(
@@ -189,7 +195,7 @@ fun ProfileSearchScreen(navController: NavController? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(32.dp),
+                            .padding(2.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
@@ -199,7 +205,7 @@ fun ProfileSearchScreen(navController: NavController? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(32.dp),
+                            .padding(2.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -214,7 +220,7 @@ fun ProfileSearchScreen(navController: NavController? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(32.dp),
+                            .padding(2.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -227,7 +233,7 @@ fun ProfileSearchScreen(navController: NavController? = null) {
                 }
                 else -> {
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(filteredUsers) { user ->
                             UserProfileCard(
@@ -266,7 +272,7 @@ fun UserProfileCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -275,7 +281,7 @@ fun UserProfileCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -287,7 +293,7 @@ fun UserProfileCard(
                 modifier = Modifier.weight(1f)
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(2.dp))
 
             // Action Button
             when (user.friendshipStatus) {

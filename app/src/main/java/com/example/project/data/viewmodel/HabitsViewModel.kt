@@ -9,6 +9,7 @@ import com.example.project.data.util.toFirestoreMap
 import com.example.project.data.util.toHabit
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.firestore
 
@@ -54,6 +55,14 @@ class HabitViewModel : ViewModel() {
     fun markHabitAsDone(habit: Habit) {
         val uid = auth.currentUser?.uid ?: return
         val now = System.currentTimeMillis()
+
+        val xpReward = when (habit.frequency) {
+            is Frequency.Hourly -> 10
+            is Frequency.Daily -> 25
+            is Frequency.Weekly -> 50
+            is Frequency.Monthly -> 100
+            is Frequency.Yearly -> 200
+        }
 
         firestore.collection("users").document(uid)
             .collection("habits")
