@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.project.data.viewmodel.HabitViewModel
@@ -69,11 +70,9 @@ fun AccountScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(currentUser?.uid) {
-        // Get account creation date from Firebase Auth metadata
-        currentUser?.metadata?.creationTimestamp?.let { timestamp ->
-            val date = Date(timestamp)
-            val formatter = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
-            joinedDate = formatter.format(date)
+        if (currentUser?.uid != null) {
+            // This should trigger the listener in your ViewModel
+            userViewModel.listenToNotifications()
         }
     }
 
@@ -290,19 +289,20 @@ fun AccountMenuItem(
             )
 
             if (badge != null && badge > 0) {
-                BadgedBox(
-                    badge = {
-                        Badge(
-                            containerColor = Purple
-                        ) {
-                            Text(
-                                text = badge.toString(),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
-                ) {}
+                Badge(
+                    containerColor = Purple,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text(
+                        text = badge.toString(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
             }
         }
     }

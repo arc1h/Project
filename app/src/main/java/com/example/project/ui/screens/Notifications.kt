@@ -1,173 +1,248 @@
 package com.example.project.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import android.app.TimePickerDialog
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.project.data.util.acceptFriendRequest
-import com.example.project.data.util.declineFriendRequest
+import com.example.project.data.util.scheduleHabitAlarm
+import com.example.project.data.viewmodel.UserViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.*
+
+// --- Data Models ---
 
 data class FriendRequest(
     val requesterId: String,
     val requesterUsername: String
 )
 
+data class InAppNotification(
+    val title: String,
+    val timestamp: String,
+    val type: String // "REMINDER" or "FRIEND_REQUEST"
+)
+
+// --- Main Screen ---
+
 @Composable
-fun Notifications(navController: NavController? = null) {
-    var friendRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var refreshTrigger by remember { mutableStateOf(0) }
+fun Notifications(navController: NavController? = null, userViewModel: UserViewModel) {
+    val context = LocalContext.current
+    val firestore = Firebase.firestore
     val currentUserId = Firebase.auth.currentUser?.uid
+    val prefs = remember { context.getSharedPreferences("prefs", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(refreshTrigger) {
-        isLoading = true
-        currentUserId ?: return@LaunchedEffect
+    var friendRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
+    var inAppNotifications by remember { mutableStateOf<List<InAppNotification>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var reminderTime by remember {
+        mutableStateOf(prefs.getString("reminder_time", "Not Set") ?: "Not Set")
+    }
 
-        try {
-            val firestore = Firebase.firestore
+    val timePickerDialog = TimePickerDialog(context, { _, hour, minute ->
+        val formattedTime = String.format("%02d:%02d", hour, minute)
+        reminderTime = formattedTime
+        prefs.edit().putString("reminder_time", formattedTime).apply()
+        scheduleHabitAlarm(context, "Daily Goal", hour, minute)
+        Toast.makeText(context, "Reminder set for $formattedTime", Toast.LENGTH_SHORT).show()
+    }, 12, 0, false)
 
-            // Get current user's received friend requests
-            val currentUserDoc = firestore.collection("users").document(currentUserId).get().await()
-            val receivedRequestIds = currentUserDoc.get("receivedFriendRequests") as? List<String> ?: emptyList()
-
-            // Fetch usernames for each request
-            val requests = receivedRequestIds.mapNotNull { requesterId ->
-                try {
-                    val requesterDoc = firestore.collection("users").document(requesterId).get().await()
-                    val username = requesterDoc.getString("username") ?: "Unknown User"
-                    FriendRequest(requesterId, username)
-                } catch (e: Exception) {
-                    null
-                }
-            }
-
-            friendRequests = requests
-        } catch (e: Exception) {
-            // Handle error
-        } finally {
+    DisposableEffect(currentUserId) {
+        if (currentUserId == null) {
             isLoading = false
+            onDispose { }
+        } else {
+            // Logic: Clear the badge visual when the user enters the screen
+            userViewModel.clearBadge()
+
+            val historyRegistration = firestore.collection("users").document(currentUserId)
+                .collection("notifications")
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .addSnapshotListener { snapshot, error -> // Added 'error' back in
+                    if (error == null && snapshot != null) {
+                        inAppNotifications = snapshot.documents.map { doc ->
+                            InAppNotification(
+                                title = doc.getString("title") ?: "Reminder",
+                                timestamp = SimpleDateFormat("HH:mm", Locale.getDefault())
+                                    .format(Date(doc.getLong("timestamp") ?: 0L)),
+                                type = doc.getString("type") ?: "REMINDER"
+                            )
+                        }
+                    }
+                    isLoading = false
+                }
+
+            val userDocReg = firestore.collection("users").document(currentUserId)
+                .addSnapshotListener { snapshot, _ ->
+                    val requestIds = snapshot?.get("receivedFriendRequests") as? List<String> ?: emptyList()
+                    scope.launch {
+                        val updatedList = requestIds.map { id ->
+                            // Fetching the document for each ID to get the 'username' field
+                            val userDoc = firestore.collection("users").document(id).get().await()
+                            FriendRequest(
+                                requesterId = id,
+                                requesterUsername = userDoc.getString("username") ?: "Unknown User"
+                            )
+                        }
+                        friendRequests = updatedList
+                    }
+                }
+
+            onDispose {
+                historyRegistration.remove()
+                userDocReg.remove()
+            }
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp)
-        ) {
-            // Title
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Notifications",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 24.dp)
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            // Content
-            when {
-                isLoading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Daily Reminder Settings Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Daily Reminder",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = if (reminderTime == "Not Set") "Keep your streak alive!" else "Set for $reminderTime",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = { timePickerDialog.show() },
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        CircularProgressIndicator()
+                        Text("Set Time")
                     }
                 }
-                friendRequests.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "No notifications",
-                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "You're all caught up!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center
-                            )
-                        }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(text = "Requests & History", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else if (friendRequests.isEmpty() && inAppNotifications.isEmpty()) {
+                EmptyStateView()
+            } else {
+                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(friendRequests) { request ->
+                        FriendRequestCard(request, {}, {})
+                    }
+                    items(inAppNotifications) { notification ->
+                        NotificationHistoryCard(notification)
                     }
                 }
-                else -> {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(friendRequests) { request ->
-                            FriendRequestCard(
-                                request = request,
-                                onAccept = {
-                                    scope.launch {
-                                        currentUserId?.let { userId ->
-                                            acceptFriendRequest(userId, request.requesterId)
-                                            refreshTrigger++ // Refresh the list
-                                        }
-                                    }
-                                },
-                                onDecline = {
-                                    scope.launch {
-                                        currentUserId?.let { userId ->
-                                            declineFriendRequest(userId, request.requesterId)
-                                            refreshTrigger++ // Refresh the list
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                    }
+
+                if (inAppNotifications.isNotEmpty()) {
+                    TextButton(
+                        onClick = { clearAllNotifications(currentUserId) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Clear All History") }
+                }
+            }
+        }
+    }
+}
+
+// --- Supporting UI Components ---
+
+@Composable
+fun NotificationHistoryCard(notification: InAppNotification) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(if (notification.type == "REMINDER") "⏰" else "👥", fontSize = 24.sp)
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(notification.title, style = MaterialTheme.typography.bodyLarge)
+                Text(notification.timestamp, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+fun FriendRequestCard(request: FriendRequest, onAccept: () -> Unit, onDecline: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "${request.requesterUsername} sent you a friend request",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = onAccept,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Accept")
+                }
+                OutlinedButton(
+                    onClick = onDecline,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Decline")
                 }
             }
         }
@@ -175,60 +250,39 @@ fun Notifications(navController: NavController? = null) {
 }
 
 @Composable
-fun FriendRequestCard(
-    request: FriendRequest,
-    onAccept: () -> Unit,
-    onDecline: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+fun EmptyStateView() {
+    Box(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Message
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "${request.requesterUsername} sent you a friend request",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                text = "No notifications",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = onAccept,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Accept")
-                }
-
-                OutlinedButton(
-                    onClick = onDecline,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Decline")
-                }
-            }
+            Text(
+                text = "You're all caught up!",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
         }
     }
+}
+
+fun clearAllNotifications(uid: String?) {
+    if (uid == null) return
+    val db = Firebase.firestore
+
+    // Batch delete is better for performance
+    db.collection("users").document(uid).collection("notifications")
+        .get()
+        .addOnSuccessListener { snapshot ->
+            val batch = db.batch()
+            for (doc in snapshot.documents) {
+                batch.delete(doc.reference)
+            }
+            batch.commit()
+        }
 }

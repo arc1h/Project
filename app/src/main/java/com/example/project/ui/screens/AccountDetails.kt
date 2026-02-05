@@ -26,6 +26,7 @@ import com.example.project.navigation.Screen
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
 @Composable
 fun AccountDetails(
@@ -40,6 +41,8 @@ fun AccountDetails(
     val username = userViewModel.username ?: "Loading..."
     val email = currentUser?.email ?: ""
     val userId = currentUser?.uid ?: ""
+
+    val scope = rememberCoroutineScope()
 
     // Dialog states
     var showEditUsernameDialog by remember { mutableStateOf(false) }
@@ -200,18 +203,22 @@ fun AccountDetails(
             currentUsername = username,
             onDismiss = { showEditUsernameDialog = false },
             onConfirm = { newUsername ->
-                db.collection("users").document(userId)
-                    .update("username", newUsername)
-                    .addOnSuccessListener {
-                        userViewModel.refresh()
+                // Use the 'scope' we just defined to launch the suspend function
+                scope.launch {
+                    val success = userViewModel.updateUsername(newUsername)
+
+                    if (success) {
                         feedbackMessage = "Username updated successfully"
                         isError = false
                         showEditUsernameDialog = false
-                    }
-                    .addOnFailureListener { e ->
-                        feedbackMessage = "Failed to update username: ${e.message}"
+                        // Note: No need to call refresh()!
+                        // Your ViewModel's SnapshotListener will see the DB change
+                        // and update the UI automatically.
+                    } else {
+                        feedbackMessage = "Username is already taken or update failed"
                         isError = true
                     }
+                }
             }
         )
     }

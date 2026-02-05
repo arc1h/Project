@@ -20,12 +20,17 @@ class UserViewModel : ViewModel() {
     private val TAG = "UserViewModel"
 
     private var listenerRegistration: ListenerRegistration? = null
+    private var notificationsListener: ListenerRegistration? = null
 
     var username by mutableStateOf<String?>(null)
         private set
 
+    // Must be mutableStateOf so the Badge in AccountScreen updates automatically
     var notificationCount by mutableIntStateOf(0)
         private set
+
+    private var requestsCount = 0
+    private var remindersCount = 0
 
     var isLoading by mutableStateOf(true)
         private set
@@ -44,8 +49,6 @@ class UserViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val uid = currentUser.uid
-
-                // Set up real-time listener for user data
                 listenerRegistration = firestore.collection("users")
                     .document(uid)
                     .addSnapshotListener { snapshot, error ->
@@ -57,45 +60,60 @@ class UserViewModel : ViewModel() {
                         }
 
                         if (snapshot != null && snapshot.exists()) {
-                            username = snapshot.getString("username")
-                                ?: currentUser.displayName
-                                        ?: "User"
+                            username = snapshot.getString("username") ?: "User"
 
-                            // Get notification count
-                            val receivedRequests = snapshot.get("receivedFriendRequests") as? List<String>
-                                ?: emptyList()
-                            notificationCount = receivedRequests.size
-                        } else {
-                            username = currentUser.displayName ?: "User"
+                            // Count 1: Friend Requests Array
+                            val receivedRequests = snapshot.get("receivedFriendRequests") as? List<String> ?: emptyList()
+                            requestsCount = receivedRequests.size
+                            updateTotalCount()
                         }
-
                         isLoading = false
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "Error setting up user listener", e)
-                username = currentUser.displayName ?: "User"
                 isLoading = false
             }
         }
     }
 
-    /**
-     * Call this when user logs out to reset state
-     */
-    fun reset() {
-        listenerRegistration?.remove()
-        listenerRegistration = null
-        username = null
-        notificationCount = 0
-        isLoading = true
+    fun listenToNotifications() {
+        val uid = auth.currentUser?.uid ?: return
+        notificationsListener?.remove()
+
+        notificationsListener = firestore.collection("users").document(uid).collection("notifications")
+            .addSnapshotListener { snapshot, _ ->
+                // Count 2: Sub-collection documents
+                remindersCount = snapshot?.size() ?: 0
+                updateTotalCount()
+            }
     }
 
-    /**
-     * Call this when a new user logs in
-     */
+    private fun updateTotalCount() {
+        notificationCount = requestsCount + remindersCount
+    }
+
+    fun clearBadge() {
+        notificationCount = 0
+    }
+
     fun refresh() {
-        reset()
-        loadUserData()
+        reset()         // Clears all existing listeners and state
+        loadUserData()  // Starts the main user document listener
+        // Note: listenToNotifications() is usually called by the
+        // LaunchedEffect in AccountScreen/Notifications, but you can
+        // also trigger it here if you want it active immediately.
+        listenToNotifications()
+    }
+
+    fun reset() {
+        listenerRegistration?.remove()
+        notificationsListener?.remove()
+        listenerRegistration = null
+        notificationsListener = null
+        username = null
+        notificationCount = 0
+        requestsCount = 0
+        remindersCount = 0
+        isLoading = true
     }
 
     suspend fun updateUsername(newUsername: String): Boolean {

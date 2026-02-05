@@ -131,7 +131,10 @@ fun AppRoot() {
             }
 
             composable("notifications") {
-                Notifications(navController = navController)
+                Notifications(
+                    navController = navController,
+                    userViewModel = userViewModel
+                )
             }
 
             composable("app_settings") {

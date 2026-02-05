@@ -28,7 +28,7 @@
         </activity>
         <receiver
             android:name=".data.notifications.NotificationWorker"
-            android:exported="false">
-        </receiver>
+            android:enabled="true"
+            android:exported="false" />
     </application>
 </manifest>

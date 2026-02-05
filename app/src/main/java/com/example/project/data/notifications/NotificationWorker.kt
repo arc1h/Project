@@ -1,44 +1,88 @@
 package com.example.project.data.notifications
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
+import android.media.RingtoneManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.example.project.R
+import com.example.project.data.util.scheduleHabitAlarm
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.firestore
+import java.util.Calendar
 
 class NotificationWorker : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val habitName = intent.getStringExtra("HABIT_NAME") ?: "Habit Reminder"
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "habit_reminders"
 
-        // Vibration pattern: Wait 0ms, Vibrate 500ms, Wait 200ms, Vibrate 500ms
-        var vibrationPattern = longArrayOf(0, 500, 200, 500)
+        // 1. Show the visual notification first
+        showNotification(context, habitName)
 
-        val channel = NotificationChannel(
-            channelId,
-            "Habit Reminders",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "Notifications for habit reminders"
-            enableLights(true)
-            lightColor = Color.MAGENTA
-            enableVibration(true)
+        // 2. Use goAsync to allow time for the Firestore write
+        val pendingResult = goAsync()
+
+        saveNotificationToFirestore(habitName) {
+            // 3. Tell the system we are officially done
+            pendingResult.finish()
         }
-        notificationManager.createNotificationChannel(channel)
+        val cal = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, 1) // Increment by 1 day
+        }
+        scheduleHabitAlarm(context, habitName, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
+    }
+
+    private fun showNotification(context: Context, habitName: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "habit_reminders_channel"
+        val vibrationPattern = longArrayOf(0, 500, 200, 500)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Habit Reminders",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Reminders for your daily habits"
+                enableVibration(true)
+                this.vibrationPattern = vibrationPattern // Fixed the 'val' reassignment issue
+                setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), null)
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // Ensure this icon exists!
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Habit Time!")
-            .setContentText("Don't forget to: $habitName")
+            .setContentText("Don't forget: $habitName")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVibrate(vibrationPattern) // Vibration for older Android versions
+            .setVibrate(vibrationPattern)
+            .setDefaults(Notification.DEFAULT_ALL)
             .setAutoCancel(true)
             .build()
 
         notificationManager.notify(habitName.hashCode(), notification)
+    }
+
+    private fun saveNotificationToFirestore(title: String, onComplete: () -> Unit) {
+        val uid = Firebase.auth.currentUser?.uid ?: run {
+            onComplete()
+            return
+        }
+
+        val notificationData = hashMapOf(
+            "title" to title,
+            "timestamp" to System.currentTimeMillis(),
+            "type" to "REMINDER"
+        )
+
+        Firebase.firestore.collection("users").document(uid).collection("notifications")
+            .add(notificationData)
+            .addOnCompleteListener {
+                onComplete() // Signal finish regardless of success or failure
+            }
     }
 }

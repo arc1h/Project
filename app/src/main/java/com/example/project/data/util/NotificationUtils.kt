@@ -10,24 +10,15 @@ import com.example.project.data.notifications.NotificationWorker
 import java.util.Calendar
 
 fun scheduleHabitAlarm(context: Context, habitName: String, hour: Int, minute: Int) {
-    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    // Check if we have permission to schedule exact alarms (Android 12+)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (!alarmManager.canScheduleExactAlarms()) {
-            // Log it or show a Toast. You'll need to ask the user for permission in Settings.
-            Log.e("AlarmUtils", "Cannot schedule exact alarm: Permission missing")
-            return
-        }
-    }
-
+    // IMPORTANT: The intent must point to NotificationWorker::class.java
     val intent = Intent(context, NotificationWorker::class.java).apply {
         putExtra("HABIT_NAME", habitName)
     }
 
     val pendingIntent = PendingIntent.getBroadcast(
         context,
-        habitName.hashCode(),
+        0, // Use a unique ID if you have multiple habits
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
@@ -36,19 +27,39 @@ fun scheduleHabitAlarm(context: Context, habitName: String, hour: Int, minute: I
         set(Calendar.HOUR_OF_DAY, hour)
         set(Calendar.MINUTE, minute)
         set(Calendar.SECOND, 0)
+        // If the time has already passed today, schedule for tomorrow
         if (before(Calendar.getInstance())) {
             add(Calendar.DATE, 1)
         }
     }
 
-    try {
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                pendingIntent
+            )
+        } else {
+            // Option A: Fallback to a non-exact alarm (might be late)
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                pendingIntent
+            )
+            // Option B: Ask user to enable permission in Settings
+            val intent = Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+            context.startActivity(intent)
+        }
+    } else {
+        // For older Android versions, no check is needed
         alarmManager.setExactAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             calendar.timeInMillis,
             pendingIntent
         )
-    } catch (e: SecurityException) {
-        Log.e("AlarmUtils", "SecurityException: Exact alarm permission revoked", e)
     }
 }
 
