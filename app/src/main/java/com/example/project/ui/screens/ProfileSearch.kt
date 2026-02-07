@@ -140,10 +140,10 @@ fun ProfileSearch(navController: NavController? = null) {
                     "Profile Search",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier
-                        .padding(top = 36.dp, bottom = 8.dp)
+                        .padding(bottom = 8.dp)
                 ) },
                 navigationIcon = {
-                    IconButton(onClick = { navController?.navigateUp() }, modifier = Modifier.padding(top = 36.dp, bottom = 8.dp)) {
+                    IconButton(onClick = { navController?.navigateUp() }, modifier = Modifier.padding(bottom = 8.dp)) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"

@@ -5,20 +5,20 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
-import com.example.project.data.notifications.NotificationWorker
+import com.example.project.data.worker.NotificationWorker
 import java.util.Calendar
 
 fun scheduleHabitAlarm(context: Context, habitName: String, hour: Int, minute: Int) {
-
-    // IMPORTANT: The intent must point to NotificationWorker::class.java
     val intent = Intent(context, NotificationWorker::class.java).apply {
         putExtra("HABIT_NAME", habitName)
     }
 
+    // FIX: Use habitName.hashCode() so it matches the cancel function
+    val requestCode = habitName.hashCode()
+
     val pendingIntent = PendingIntent.getBroadcast(
         context,
-        0, // Use a unique ID if you have multiple habits
+        requestCode,
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )

@@ -24,10 +24,12 @@ import com.example.project.ui.screens.AccountScreen
 import com.example.project.ui.screens.AppSettings
 import com.example.project.ui.screens.HabitsScreen
 import com.example.project.ui.screens.HeroScreen
+import com.example.project.ui.screens.History
 import com.example.project.ui.screens.LoginScreen
 import com.example.project.ui.screens.Notifications
 import com.example.project.ui.screens.ProfileSearch
 import com.example.project.ui.screens.ProgressScreen
+import com.example.project.ui.screens.Shop
 import com.example.project.ui.screens.SplashScreen
 import com.example.project.ui.theme.HeroTypography
 import com.example.project.ui.theme.NavigationBar
@@ -115,7 +117,14 @@ fun AppRoot() {
             }
 
             composable(Screen.Hero.route) {
-                HeroScreen(heroViewModel = heroViewModel)
+                HeroScreen(
+                    heroViewModel = heroViewModel,
+                    navController = navController
+                )
+            }
+
+            composable("shop") {
+                Shop(navController = navController)
             }
 
             composable(Screen.Account.route) {
@@ -134,6 +143,12 @@ fun AppRoot() {
                 Notifications(
                     navController = navController,
                     userViewModel = userViewModel
+                )
+            }
+
+            composable("history") {
+                History(
+                    navController = navController
                 )
             }
 

@@ -5,29 +5,35 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.example.project.R
-import com.example.project.ui.theme.PixelatedFont
 
-val PixelatedFont = FontFamily(
+val PixelFont = FontFamily(
     Font(
-        resId = R.font.pixel_cond,
-        weight = FontWeight.Normal
+        resId = R.font.pixel,
+        weight = FontWeight.SemiBold
+    )
+)
+
+val PixelTitle = FontFamily(
+    Font(
+        resId = R.font.pixel_title,
+        weight = FontWeight.Bold
     )
 )
 
 val HeroTypography = Typography(
     headlineLarge = Typography().headlineLarge.copy(
-        fontFamily = PixelatedFont
+        fontFamily = PixelFont
     ),
     headlineMedium = Typography().headlineMedium.copy(
-        fontFamily = PixelatedFont
+        fontFamily = PixelFont
     ),
     bodyLarge = Typography().bodyLarge.copy(
-        fontFamily = PixelatedFont
+        fontFamily = PixelFont
     ),
     bodyMedium = Typography().bodyMedium.copy(
-        fontFamily = PixelatedFont
+        fontFamily = PixelFont
     ),
     labelLarge = Typography().labelLarge.copy(
-        fontFamily = PixelatedFont
+        fontFamily = PixelFont
     )
 )

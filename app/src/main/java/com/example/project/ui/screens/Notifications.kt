@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,6 +45,7 @@ data class InAppNotification(
 
 // --- Main Screen ---
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Notifications(navController: NavController? = null, userViewModel: UserViewModel) {
     val context = LocalContext.current
@@ -62,8 +65,8 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
         val formattedTime = String.format("%02d:%02d", hour, minute)
         reminderTime = formattedTime
         prefs.edit().putString("reminder_time", formattedTime).apply()
-        scheduleHabitAlarm(context, "Daily Goal", hour, minute)
-        Toast.makeText(context, "Reminder set for $formattedTime", Toast.LENGTH_SHORT).show()
+        scheduleHabitAlarm(context, "Daily Reminder", hour, minute)
+        Toast.makeText(context, "Daily reminder set for $formattedTime", Toast.LENGTH_SHORT).show()
     }, 12, 0, false)
 
     DisposableEffect(currentUserId) {
@@ -86,7 +89,7 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                                     .format(Date(doc.getLong("timestamp") ?: 0L)),
                                 type = doc.getString("type") ?: "REMINDER"
                             )
-                        }
+                        }.distinctBy { it.title + it.timestamp }
                     }
                     isLoading = false
                 }
@@ -114,16 +117,42 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
         }
     }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Notifications",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "Notifications",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController?.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 24.dp)
+        ) {
+            // REMOVE the old "Notifications" Text() and Spacer() from here
+            // because they are now in the TopAppBar
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp)) // Small breathing room after TopAppBar
 
             // Daily Reminder Settings Card
             Card(
@@ -141,7 +170,7 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Daily Reminder",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
                             text = if (reminderTime == "Not Set") "Keep your streak alive!" else "Set for $reminderTime",
@@ -159,7 +188,7 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text(text = "Requests & History", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+            Text(text = "Habits & Requests", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
             Spacer(modifier = Modifier.height(12.dp))
 
             if (isLoading) {
@@ -167,7 +196,10 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
             } else if (friendRequests.isEmpty() && inAppNotifications.isEmpty()) {
                 EmptyStateView()
             } else {
-                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     items(friendRequests) { request ->
                         FriendRequestCard(request, {}, {})
                     }
@@ -179,9 +211,15 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                 if (inAppNotifications.isNotEmpty()) {
                     TextButton(
                         onClick = { clearAllNotifications(currentUserId) },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text("Clear All History") }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Clear All History")
+                    }
                 }
             }
         }
@@ -203,8 +241,7 @@ fun NotificationHistoryCard(notification: InAppNotification) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(if (notification.type == "REMINDER") "⏰" else "👥", fontSize = 24.sp)
-            Spacer(modifier = Modifier.width(16.dp))
+            //
             Column {
                 Text(notification.title, style = MaterialTheme.typography.bodyLarge)
                 Text(notification.timestamp, style = MaterialTheme.typography.bodySmall, color = Color.Gray)

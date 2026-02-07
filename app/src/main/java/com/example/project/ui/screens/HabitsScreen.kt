@@ -1,13 +1,17 @@
 package com.example.project.ui.screens
 
+import android.app.TimePickerDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,8 +22,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
@@ -34,7 +38,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -42,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,12 +55,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project.data.model.Frequency
 import com.example.project.data.model.Habit
+import com.example.project.data.model.HabitDifficulty
 import com.example.project.data.viewmodel.HabitViewModel
 import com.example.project.data.viewmodel.HeroViewModel
 import com.example.project.data.viewmodel.UserViewModel
@@ -66,12 +71,7 @@ import kotlinx.coroutines.delay
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import android.app.TimePickerDialog
-import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
-import androidx.compose.foundation.layout.Row
-import com.example.project.data.util.cancelHabitAlarm
-import com.example.project.data.util.scheduleHabitAlarm
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +83,6 @@ fun HabitsScreen(
     val habits = habitViewModel.habits
     val userName = userViewModel.username ?: "User"
     val isLoadingUser = userViewModel.isLoading
-    // Fix: Get Android context for the alarm manager
     val context = LocalContext.current
 
     var showHabitsLoading by remember { mutableStateOf(true) }
@@ -95,6 +94,23 @@ fun HabitsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
 
+    val listState = rememberLazyListState()
+    val shouldHideFab by remember {
+        derivedStateOf {
+            val isScrollingDown = listState.firstVisibleItemScrollOffset > 0 || listState.firstVisibleItemIndex > 0
+
+            // We hide it if:
+            // - We are at the very bottom (can't scroll forward anymore)
+            // - OR we are currently actively scrolling down
+            val isAtBottom = !listState.canScrollForward
+            val isMovingDown = listState.isScrollInProgress &&
+                    listState.firstVisibleItemIndex >= (listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0)
+
+            // Reappear only if scrolling UP or at the very top
+            isAtBottom || (isScrollingDown && isMovingDown)
+        }
+    }
+
     LaunchedEffect(Unit) {
         delay(300)
         showHabitsLoading = false
@@ -103,6 +119,7 @@ fun HabitsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
+            Spacer(Modifier.height(12.dp))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -126,12 +143,18 @@ fun HabitsScreen(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = Purple,
-                contentColor = Color.White
+            AnimatedVisibility(
+                visible = !shouldHideFab,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Habit")
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = Purple,
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Habit")
+                }
             }
         }
     ) { padding ->
@@ -149,83 +172,64 @@ fun HabitsScreen(
                 // Empty state UI...
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(habits, key = { it.id }) { habit ->
                         HabitCard(
                             habit = habit,
+                            // Inside HabitsScreen.kt -> onChecked block
                             onChecked = {
-                                habitViewModel.markHabitAsDone(habit)
-                                rewardForHabitCompletion(habit, heroViewModel)
+                                habitViewModel.toggleHabit(habit)
+
+                                // 1. General Progress (Consistency Star)
+                                heroViewModel.incrementChallengeProgress("habit_completed")
+
+                                // 2. Early Bird Check (Before 11 AM)
+                                val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                                if (currentHour < 11) {
+                                    heroViewModel.incrementChallengeProgress("morning_habit")
+                                }
+
+                                // 3. ADD THIS: Hard Mode Check
+                                // If the habit you just checked is 'HARD', send the specific signal
+                                if (habit.difficulty == HabitDifficulty.HARD) {
+                                    heroViewModel.incrementChallengeProgress("hard_habit")
+                                }
                             },
-                            onEdit = { editingHabit = habit }, // Trigger Edit Dialog
-                            onDelete = {
-                                // Cancel alarm before deleting
-                                cancelHabitAlarm(context, habit.name)
-                                habitViewModel.deleteHabit(habit)
-                            }
+                            onEdit = { editingHabit = habit },
+                            onDelete = { habitViewModel.deleteHabit(context, habit) }
                         )
                     }
                 }
             }
         }
 
-        // ADD NEW HABIT DIALOG
         if (showAddDialog) {
             HabitDialog(
                 title = "Create New Habit",
                 onDismiss = { showAddDialog = false },
-                onSave = { name, frequency, time ->
-                    habitViewModel.addHabit(name, frequency)
-                    if (time != "Off") {
-                        val parts = time.split(":")
-                        scheduleHabitAlarm(context, name, parts[0].toInt(), parts[1].toInt())
-                    }
+                onSave = { name, frequency, difficulty, time ->
+                    habitViewModel.addHabit(context, name, frequency, difficulty, time)
                     showAddDialog = false
                 }
             )
         }
 
-        // EDIT EXISTING HABIT DIALOG
         editingHabit?.let { habit ->
             HabitDialog(
                 title = "Edit Habit",
                 habit = habit,
                 onDismiss = { editingHabit = null },
-                onSave = { name, frequency, time ->
-                    // 1. Cancel old alarm (in case name or time changed)
-                    cancelHabitAlarm(context, habit.name)
-
-                    // 2. Update Database
-                    habitViewModel.editHabit(habit, name, frequency)
-
-                    // 3. Schedule new alarm if time is set
-                    if (time != "Off") {
-                        val parts = time.split(":")
-                        scheduleHabitAlarm(context, name, parts[0].toInt(), parts[1].toInt())
-                    }
+                onSave = { name, frequency, difficulty, time ->
+                    habitViewModel.editHabit(context, habit, name, frequency, difficulty, time)
                     editingHabit = null
                 }
             )
         }
     }
-}
-
-// REWARD FUNCTION
-fun rewardForHabitCompletion(habit: Habit, heroViewModel: HeroViewModel) {
-    val xpReward = when (habit.frequency) {
-        is Frequency.Hourly -> 10
-        is Frequency.Daily -> 25
-        is Frequency.Weekly -> 50
-        is Frequency.Monthly -> 100
-    }
-
-    val coinReward = xpReward / 2
-
-    heroViewModel.addXP(xpReward)
-    heroViewModel.addCoins(coinReward)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -234,7 +238,7 @@ fun HabitDialog(
     title: String,
     habit: Habit? = null,
     onDismiss: () -> Unit,
-    onSave: (String, Frequency, String) -> Unit // Added String for reminderTime
+    onSave: (String, Frequency, HabitDifficulty, String) -> Unit
 ) {
     var name by remember { mutableStateOf(habit?.name ?: "") }
     var nameError by remember { mutableStateOf(false) }
@@ -244,8 +248,10 @@ fun HabitDialog(
     var selectedDays by remember { mutableStateOf(habit?.frequency?.daysOfWeek ?: emptySet()) }
 
     // Reminder State
-    var reminderTime by remember { mutableStateOf("Off") }
+    var reminderTime by remember { mutableStateOf(habit?.reminderTime ?: "Off") }
     val context = LocalContext.current
+
+    var selectedDifficulty by remember { mutableStateOf(habit?.difficulty ?: HabitDifficulty.EASY) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -271,9 +277,7 @@ fun HabitDialog(
                         value = selectedType.replaceFirstChar { it.uppercase() },
                         onValueChange = {},
                         label = { Text("Frequency Type") },
-                        modifier = Modifier
-                            .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = true)
-                            .fillMaxWidth(),
+                        modifier = Modifier.menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = true).fillMaxWidth(),
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         colors = ExposedDropdownMenuDefaults.textFieldColors()
@@ -293,17 +297,21 @@ fun HabitDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Interval Control Row
+                Text("Difficulty", style = MaterialTheme.typography.bodyMedium)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Every $interval ${Frequency.getUnitName(selectedType, interval)}")
-                    Row {
-                        IconButton(onClick = { if (interval > 1) interval-- }) { Text("−") }
-                        Text(text = "$interval", modifier = Modifier.padding(top = 12.dp))
-                        IconButton(onClick = { if (interval < 99) interval++ }) { Text("+") }
+                    HabitDifficulty.entries.forEach { difficulty -> // Use .entries for modern Kotlin
+                        FilterChip(
+                            selected = selectedDifficulty == difficulty,
+                            onClick = { selectedDifficulty = difficulty },
+                            label = { Text(difficulty.toDisplayString()) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Purple,
+                                selectedLabelColor = Color.White
+                            )
+                        )
                     }
                 }
 
@@ -342,8 +350,8 @@ fun HabitDialog(
                             interval,
                             daysOfWeek = if (selectedDays.isEmpty()) null else selectedDays
                         )
-                        // Pass the reminderTime back to HabitsScreen
-                        onSave(name, frequency, reminderTime)
+                        // Pass selectedDifficulty here!
+                        onSave(name, frequency, selectedDifficulty, reminderTime)
                     } else {
                         nameError = true
                     }

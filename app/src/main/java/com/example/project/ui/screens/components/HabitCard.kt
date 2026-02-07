@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -36,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -43,7 +45,9 @@ import com.example.project.data.model.Habit
 import com.example.project.ui.theme.Purple
 import com.example.project.ui.theme.White
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.project.data.util.cancelHabitAlarm
+import com.example.project.ui.theme.LightGray
 
 @Composable
 fun HabitCard(
@@ -59,72 +63,89 @@ fun HabitCard(
     val cardColor = MaterialTheme.colorScheme.surface
     val textColor = MaterialTheme.colorScheme.onSurface
     val subtextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-    val borderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) // subtle
 
-    // Calculate completion status once
-    val isDoneNow = habit.isDoneNow() // uses lastCompleted + frequency logic
-    val disabledColor = MaterialTheme.colorScheme.outline
+    val isDoneNow = habit.isDoneNow()
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(100.dp),
-        shape = RoundedCornerShape(16.dp),
-        border = null,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, LightGray),
         colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp),
+                .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp)
+            ) {
                 Text(
                     text = habit.name,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = textColor
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (isDoneNow) Color.Gray else textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = habit.frequency.toDisplayString(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = subtextColor
+                    color = subtextColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
+            // RIGHT SIDE
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.wrapContentWidth()
             ) {
                 Button(
                     onClick = { onChecked() },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isDoneNow) disabledColor else Purple,
-                        disabledContainerColor = disabledColor,
-                        contentColor = White
+                        containerColor = if (isDoneNow) Color.Transparent else Purple,
+                        disabledContainerColor = Color.Transparent,
+                        contentColor = if (isDoneNow) Color.Gray else White
                     ),
                     shape = RoundedCornerShape(8.dp),
+                    border = if (isDoneNow) BorderStroke(1.dp, Color.LightGray) else null,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     enabled = !isDoneNow
                 ) {
-                    Icon(imageVector = Icons.Default.Check, contentDescription = "Done", tint = White, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Done",
+                        tint = if (isDoneNow) Color.Gray else White,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Done", color = White, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = if (isDoneNow) "Completed" else "Done",
+                        color = if (isDoneNow) Color.Gray else White,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
 
-                // Options Menu
+                // Options Menu (IconButton)
                 Box {
                     IconButton(
                         onClick = { menuExpanded = true },
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             Icons.Default.MoreVert,
                             contentDescription = "Options",
-                            tint = textColor
+                            tint = textColor.copy(alpha = 0.6f)
                         )
                     }
 

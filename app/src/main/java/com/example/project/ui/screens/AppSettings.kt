@@ -1,52 +1,86 @@
 package com.example.project.ui.screens
 
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.project.ui.theme.LightGray
+import com.example.project.ui.theme.Purple
 import com.example.project.ui.theme.ThemeMode
 
+@OptIn(ExperimentalMaterial3Api::class) // Added for TopAppBar
 @Composable
 fun AppSettings(
     navController: NavController,
     currentThemeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit
 ) {
-    // Use currentThemeMode directly from parameter (comes from ThemeManager)
     var notificationsEnabled by remember { mutableStateOf(true) }
     var confirmDelete by remember { mutableStateOf(true) }
     var showAnimations by remember { mutableStateOf(true) }
 
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("prefs", Context.MODE_PRIVATE) }
+
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "App Settings",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp)
+                .padding(horizontal = 24.dp)
         ) {
-            // Title
-            Text(
-                text = "App Settings",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
+            // Note: Removed the manual Title Text and Spacer(24.dp)
+            // as they are now handled by the TopAppBar
 
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
             ) {
                 item {
                     SettingsSection(title = "Appearance") {
                         ThemeSelector(
-                            selectedMode = currentThemeMode, // Use prop, not local state
-                            onModeSelected = onThemeModeChange // Call the callback
+                            selectedMode = currentThemeMode,
+                            onModeSelected = onThemeModeChange
                         )
                     }
                 }
@@ -81,15 +115,25 @@ fun AppSettings(
                     SettingsSection(title = "App") {
                         Text(
                             text = "Version 1.0.0",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 12.sp).copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        TextButton(onClick = { /* TODO: reset preferences */ }) {
+                        TextButton(
+                            onClick = {
+                                prefs.edit().clear().apply()
+                                onThemeModeChange(ThemeMode.SYSTEM)
+                                notificationsEnabled = true
+                                confirmDelete = true
+                                showAnimations = true
+                                Toast.makeText(context, "Preferences Reset", Toast.LENGTH_SHORT).show()
+                            },
+                            contentPadding = PaddingValues(0.dp) // Aligns text to left
+                        ) {
                             Text(
-                                text = "Reset app preferences",
+                                text = "Reset Preferences",
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
@@ -108,20 +152,23 @@ fun SettingsSection(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface
         )
 
         Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
-            )
+            ),
+            border = BorderStroke(1.dp, LightGray),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 content = content
             )
         }
@@ -135,17 +182,25 @@ fun SettingsToggle(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = title,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Purple,
+                uncheckedThumbColor = Color.Gray,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         )
     }
 }
@@ -155,7 +210,7 @@ fun ThemeSelector(
     selectedMode: ThemeMode,
     onModeSelected: (ThemeMode) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         ThemeOption("System default", ThemeMode.SYSTEM, selectedMode, onModeSelected)
         ThemeOption("Light", ThemeMode.LIGHT, selectedMode, onModeSelected)
         ThemeOption("Dark", ThemeMode.DARK, selectedMode, onModeSelected)
@@ -171,8 +226,7 @@ fun ThemeOption(
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(

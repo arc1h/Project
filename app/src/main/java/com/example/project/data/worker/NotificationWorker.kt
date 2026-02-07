@@ -1,4 +1,4 @@
-package com.example.project.data.notifications
+package com.example.project.data.worker
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,30 +9,24 @@ import android.content.Intent
 import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.example.project.data.util.scheduleHabitAlarm
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
-import java.util.Calendar
 
 class NotificationWorker : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val habitName = intent.getStringExtra("HABIT_NAME") ?: "Habit Reminder"
 
-        // 1. Show the visual notification first
+        // 1. Show the visual notification
         showNotification(context, habitName)
 
-        // 2. Use goAsync to allow time for the Firestore write
+        // 2. Async Firestore Write
         val pendingResult = goAsync()
-
         saveNotificationToFirestore(habitName) {
-            // 3. Tell the system we are officially done
             pendingResult.finish()
         }
-        val cal = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, 1) // Increment by 1 day
-        }
-        scheduleHabitAlarm(context, habitName, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
+        // Alarms should be managed by your HabitViewModel to ensure the time stays consistent
+        // with what the user actually selected in the Dialog.
     }
 
     private fun showNotification(context: Context, habitName: String) {
@@ -56,7 +50,7 @@ class NotificationWorker : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Habit Time!")
+            .setContentTitle("Hey!")
             .setContentText("Don't forget: $habitName")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVibrate(vibrationPattern)

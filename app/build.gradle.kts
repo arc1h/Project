@@ -57,4 +57,5 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.ui.text)
     implementation(libs.androidx.benchmark.traceprocessor)
+    implementation(libs.androidx.work.runtime.ktx)
 }

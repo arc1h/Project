@@ -1,28 +1,35 @@
 package com.example.project.ui.screens
 
+import android.R.attr.onClick
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,14 +51,12 @@ import androidx.navigation.NavController
 import com.example.project.data.viewmodel.HabitViewModel
 import com.example.project.data.viewmodel.UserViewModel
 import com.example.project.navigation.Screen
+import com.example.project.ui.theme.LightGray
 import com.example.project.ui.theme.Purple
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 
 @Composable
@@ -69,10 +75,17 @@ fun AccountScreen(
     var showEditNameDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(currentUser?.uid) {
-        if (currentUser?.uid != null) {
-            // This should trigger the listener in your ViewModel
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
             userViewModel.listenToNotifications()
+
+            // Fetch and format the joined date
+            val timestamp = currentUser.metadata?.creationTimestamp
+            if (timestamp != null) {
+                val date = java.util.Date(timestamp)
+                val formatter = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault())
+                joinedDate = formatter.format(date) // Updates the state, making the UI appear
+            }
         }
     }
 
@@ -83,7 +96,7 @@ fun AccountScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -99,34 +112,43 @@ fun AccountScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .align(Alignment.Start)
-                        .padding(top = 24.dp, bottom = 32.dp)
+                        .padding(top = 20.dp)
                 )
 
                 // Name with edit icon
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(0.dp)
                 ) {
                     androidx.compose.foundation.layout.Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.End
                     ) {
                         Text(
                             text = userName,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold).copy(fontSize = 18.sp),
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        IconButton(onClick = { showEditNameDialog = true }) {
+                        IconButton(
+                            onClick = { showEditNameDialog = true },
+                            modifier = Modifier.size(40.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit Name",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                tint = Purple.copy(alpha = 0.8f),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Menu Options
                 AccountMenuItem(
@@ -137,7 +159,16 @@ fun AccountScreen(
                     badge = if (notificationCount > 0) notificationCount else null
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                AccountMenuItem(
+                    text = "History",
+                    onClick = {
+                        navController?.navigate("history")
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 AccountMenuItem(
                     text = "Account Details",
@@ -146,7 +177,7 @@ fun AccountScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 AccountMenuItem(
                     text = "App Settings",
@@ -155,7 +186,7 @@ fun AccountScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 AccountMenuItem(
                     text = "Profile Search",
@@ -164,19 +195,13 @@ fun AccountScreen(
                     }
                 )
 
-                // Joined date section
                 if (joinedDate != null) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    HorizontalDivider(
-                        modifier = Modifier.fillMaxWidth(),
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(64.dp))
                     Text(
-                        text = "Joined $joinedDate",
+                        text = "Joined in $joinedDate",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -194,7 +219,7 @@ fun AccountScreen(
             ) {
                 Text(
                     text = "Log out",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = Color.White
                 )
             }
@@ -209,26 +234,21 @@ fun AccountScreen(
             text = { Text("Are you sure you want to log out?") },
             confirmButton = {
                 Button(
-                    onClick = {
-                        showLogoutDialog = false
-
-                        // Reset ViewModels using public reset() methods
-                        userViewModel.reset()
-                        habitViewModel.reset()
-
-                        // Sign out from Firebase
-                        FirebaseAuth.getInstance().signOut()
-
-                        // Navigate to login
-                        navController?.navigate(Screen.Login.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    },
+                    onClick = { showLogoutDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp), // Height adjusted to be sleeker
+                    shape = RoundedCornerShape(8.dp), // Matches the "Done" button in HabitCard
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Purple
-                    )
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp) // Keeps it flat
                 ) {
-                    Text("Log Out")
+                    Text(
+                        text = "Log out",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White
+                    )
                 }
             },
             dismissButton = {
@@ -262,46 +282,45 @@ fun AccountMenuItem(
     onClick: () -> Unit,
     badge: Int? = null
 ) {
-    OutlinedButton(
-        onClick = onClick,
+
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = Color.Transparent,
-            contentColor = Color.Gray
+            .height(60.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp), // Matches HabitCard
+        border = BorderStroke(1.dp, LightGray), // Matches HabitCard border
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Flat design
     ) {
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.Gray
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             if (badge != null && badge > 0) {
-                Badge(
-                    containerColor = Purple,
-                    modifier = Modifier.padding(start = 8.dp)
+                Surface(
+                    color = Purple,
+                    shape = RoundedCornerShape(8.dp), // Sharper badge to match buttons
+                    modifier = Modifier.height(24.dp).widthIn(min = 24.dp)
                 ) {
-                    Text(
-                        text = badge.toString(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 8.dp)) {
+                        Text(
+                            text = badge.toString(),
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
             }
         }

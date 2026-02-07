@@ -1,34 +1,63 @@
 package com.example.project.ui.screens
 
+import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.example.project.R
 import com.example.project.data.model.Challenge
 import com.example.project.data.viewmodel.HeroViewModel
-import com.example.project.R
 import com.example.project.ui.theme.HeroTypography
-import com.example.project.ui.theme.PixelatedFont
+import com.example.project.ui.theme.PixelFont
+import com.example.project.ui.theme.PixelTitle
+import com.example.project.ui.theme.Purple
+import kotlinx.coroutines.delay
 
 @Composable
 fun HeroScreen(
-    heroViewModel: HeroViewModel = viewModel()
+    heroViewModel: HeroViewModel = viewModel(),
+    navController: NavController? = null
 ) {
     MaterialTheme(
         typography = HeroTypography
@@ -37,6 +66,7 @@ fun HeroScreen(
     val hero = heroViewModel.hero.value
     val challenges = heroViewModel.activeChallenges.value
     val isLoading = heroViewModel.isLoading.value
+    var showAppearanceDialog by remember { mutableStateOf(false) }
 
     // Refresh data when screen is opened
     LaunchedEffect(Unit) {
@@ -61,14 +91,13 @@ fun HeroScreen(
                     // Title
                     Text(
                         text = "Your Hero",
-                        fontFamily = PixelatedFont,
+                        fontFamily = PixelTitle,
                         fontSize = 24.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
-                            .align(Alignment.Start)
-                            .padding(start = 12.dp, top = 24.dp, bottom = 24.dp)
+                            .padding(start = 12.dp, top = 24.dp)
                     )
-
+                    Spacer(Modifier.height(12.dp))
                     // Hero Stats Card
                     PixelatedCard(
                         borderColor = MaterialTheme.colorScheme.background,
@@ -80,20 +109,25 @@ fun HeroScreen(
                                 .padding(start = 8.dp, end = 12.dp, bottom = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Hero Avatar (placeholder for now)
                             Box(
                                 modifier = Modifier
-                                    .size(120.dp)
-                                    .border(2.dp, MaterialTheme.colorScheme.background)
-                                    .background(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                                    .size(150.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .border(3.dp, Color.LightGray),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Image(
-                                    painter = painterResource(R.drawable.heros00),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.FillBounds
-                                )
+                                // This padding ensures the hero sprite never touches the border
+                                Box(
+                                    modifier = Modifier
+                                        .size(150.dp)
+                                        .padding(4.dp) // Add a little margin so it doesn't touch the Card's border
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(MaterialTheme.colorScheme.surface), // Use surface color to distinguish
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AnimatedHero(charId = hero.char)
+                                }
                             }
 
                             // Stats
@@ -101,46 +135,47 @@ fun HeroScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(start = 12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 PixelStatRow("Level:", hero.level.toString())
                                 PixelStatRow("XP:", hero.xp.toString())
                                 PixelStatRow("Coins:", hero.coins.toString())
-                                PixelStatRow("Challenges", "")
-                                PixelStatRow("Completed:", hero.challengesCompleted.toString())
+                                PixelStatRow("★ Streak:", hero.longestStreak.toString())
+                                PixelStatRow("Challenges", hero.challengesCompleted.toString())
                             }
                         }
                     }
 
-                    // Active Challenges
+                    // Challenges
                     Text(
-                        text = "Active Challenges",
-                        fontFamily = PixelatedFont,
-                        fontSize = 16.sp,
+                        text = "Challenges",
+                        fontFamily = PixelTitle,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
-                            .padding(start = 12.dp, top = 24.dp)
+                            .padding(start = 8.dp, top = 24.dp)
                     )
 
                     if (challenges.isEmpty()) {
                         PixelatedCard(
-                            borderColor = MaterialTheme.colorScheme.onSurface,
+                            borderColor = Color.LightGray,
                             backgroundColor = MaterialTheme.colorScheme.background
                         ) {
                             Text(
-                                text = "No active challenges",
-                                fontFamily = PixelatedFont,
-                                fontSize = 14.sp,
+                                text = "No active challenges! \n Wait for next week..",
+                                fontFamily = PixelFont,
+                                fontSize = 16.sp,
                                 color = Color.Gray,
-                                modifier = Modifier.padding(12.dp)
+                                modifier = Modifier.padding(16.dp)
                             )
                         }
                     } else {
                         LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(vertical = 8.dp)
+                            modifier = Modifier.fillMaxWidth().height(150.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(challenges) { challenge ->
+                            items(challenges, key = { it.id }) { challenge ->
                                 ChallengeCard(
                                     challenge = challenge,
                                     borderColor = MaterialTheme.colorScheme.onSurface,
@@ -159,14 +194,25 @@ fun HeroScreen(
                     ) {
                         PixelatedButton(
                             text = "Change Appearance",
-                            onClick = { /* TODO: Navigate to appearance screen */ },
-                            borderColor = MaterialTheme.colorScheme.onSurface
+                            onClick = { showAppearanceDialog = true },
+                            borderColor = Color.LightGray
                         )
+
+                        if (showAppearanceDialog) {
+                            AppearanceDialog(
+                                currentXp = hero.xp,
+                                onDismiss = { showAppearanceDialog = false },
+                                onSelectChar = { newId ->
+                                    heroViewModel.updateHeroAppearance(newId)
+                                    showAppearanceDialog = false
+                                }
+                            )
+                        }
 
                         PixelatedButton(
                             text = "Shop",
-                            onClick = { /* TODO: Navigate to shop */ },
-                            borderColor = MaterialTheme.colorScheme.onSurface
+                            onClick = { navController?.navigate("shop") },
+                            borderColor = Color.LightGray
                         )
                     }
                 }
@@ -184,11 +230,48 @@ fun PixelatedCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Transparent) // image goes under this
-        // .border(3.dp, borderColor) // ← ONLY while debugging layout
+            .clip(RoundedCornerShape(4.dp)) // Clip EVERYTHING to the shape first
+            .background(backgroundColor)
+            .border(2.dp, borderColor, RoundedCornerShape(4.dp))
+            .padding(2.dp) // Content starts inside the border
     ) {
         content()
     }
+}
+
+@Composable
+fun AnimatedHero(charId: String?) {
+    // Force "0" if the database has anything else for now to test
+    val safeId = if (charId.isNullOrBlank() || charId == "default") "0" else charId
+
+    var isFrameTwo by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(500)
+            isFrameTwo = !isFrameTwo
+        }
+    }
+
+    val frameSuffix = if (isFrameTwo) "1" else "0"
+    val resourceName = "hero$safeId$frameSuffix"
+
+    val imageRes = remember(resourceName) {
+        val id = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
+        if (id == 0) {
+            // Log exactly what's failing
+            Log.e("ANIM", "FAILED TO FIND: $resourceName")
+            R.drawable.hero00 // Absolute fallback to your first frame
+        } else id
+    }
+
+    Image(
+        painter = painterResource(id = imageRes),
+        contentDescription = null,
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.Fit
+    )
 }
 
 @Composable
@@ -200,15 +283,16 @@ fun PixelStatRow(label: String, value: String) {
     ) {
         Text(
             text = label,
-            fontFamily = PixelatedFont,
-            fontSize = 12.sp,
+            fontFamily = PixelFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
         if (value.isNotEmpty()) {
             Text(
                 text = value,
-                fontFamily = PixelatedFont,
-                fontSize = 12.sp,
+                fontFamily = PixelFont,
+                fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
@@ -224,10 +308,10 @@ fun ChallengeCard(
 ) {
     Surface(
         modifier = Modifier
-            .width(180.dp)
-            .height(140.dp)
-            .border(3.dp, borderColor, RoundedCornerShape(4.dp)),
-        color = MaterialTheme.colorScheme.background,
+            .width(220.dp)
+            .height(160.dp),
+        color = backgroundColor,
+        border = BorderStroke(2.dp, borderColor),
         shape = RoundedCornerShape(4.dp)
     ) {
         Column(
@@ -236,37 +320,57 @@ fun ChallengeCard(
                 .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = challenge.title,
-                fontFamily = PixelatedFont,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 16.sp
-            )
-
-            if (challenge.goal > 1) {
+            Column {
                 Text(
-                    text = "${challenge.progress}/${challenge.goal}",
-                    fontFamily = PixelatedFont,
-                    fontSize = 10.sp,
+                    text = challenge.title,
+                    fontFamily = PixelFont,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                // THE DESCRIPTION
+                Text(
+                    text = challenge.description,
+                    fontFamily = PixelFont,
+                    fontSize = 12.sp,
+                    lineHeight = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3
                 )
             }
 
-            // Progress bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .border(2.dp, borderColor)
-                    .background(Color.White)
-            ) {
+            // Progress Bar Section
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "${challenge.progress}/${challenge.goal}",
+                    fontFamily = PixelFont,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                // Thick Progress Bar
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(challenge.progress.toFloat() / challenge.goal.toFloat())
-                        .background(Color(0xFF4CAF50))
-                )
+                        .fillMaxWidth()
+                        .height(24.dp) // Slightly taller
+                        .border(2.dp, borderColor)
+                        .background(Color.Black.copy(alpha = 0.2f)) // Darker track for better contrast
+                ) {
+                    val ratio = if (challenge.goal > 0)
+                        (challenge.progress.toFloat() / challenge.goal.toFloat()).coerceIn(0f, 1f)
+                    else 0f
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(ratio)
+                            .background(
+                                // Turn Purple if progress matches goal OR if marked completed
+                                if (ratio >= 1f || challenge.isCompleted) Purple else Color(0xFF4CAF50)
+                            )
+                    )
+                }
             }
         }
     }
@@ -283,22 +387,83 @@ fun PixelatedButton(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
+            .border(2.dp, borderColor, RoundedCornerShape(4.dp))
             .clickable { onClick() }
     ) {
-        // Background image
-        Image(
-            painter = painterResource(R.drawable.transparent),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize().border(2.dp, Color.Transparent, RoundedCornerShape(16.dp)),
-            contentScale = ContentScale.FillBounds
-        )
-
         Text(
             text = text,
-            fontFamily = PixelatedFont,
-            fontSize = 14.sp,
+            fontFamily = PixelFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
             modifier = Modifier.align(Alignment.Center),
             color = MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+@Composable
+fun AppearanceDialog(
+    currentXp: Int,
+    onDismiss: () -> Unit,
+    onSelectChar: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Select Hero", fontFamily = PixelFont, fontSize = 20.sp)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                val characters = listOf(
+                    Triple("0", "Rookie", 0),
+                    Triple("1", "Knight", 1000),
+                    Triple("2", "Cowboy", 2000),
+                    Triple("3", "Ninja", 3000),
+                    Triple("4", "Astronaut", 4000),
+                    Triple("5", "Skeleton", 5000),
+                )
+
+                characters.forEach { (id, name, reqXp) ->
+                    val isUnlocked = currentXp >= reqXp
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(2.dp, if (isUnlocked) MaterialTheme.colorScheme.onSurface else Color.Gray)
+                            .background(if (isUnlocked) Color.Transparent else Color.Black.copy(alpha = 0.1f))
+                            .clickable(enabled = isUnlocked) { onSelectChar(id) }
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Small preview of frame 0
+                        val resName = "hero${id}0"
+                        val context = LocalContext.current
+                        val resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
+
+                        Image(
+                            painter = painterResource(if (resId != 0) resId else R.drawable.hero00),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            // Gray out if locked
+                            alpha = if (isUnlocked) 1f else 0.4f
+                        )
+
+                        Column(modifier = Modifier.padding(start = 12.dp)) {
+                            Text(name, fontFamily = PixelFont, fontSize = 16.sp)
+                            if (!isUnlocked) {
+                                Text("Req: $reqXp XP", color = Purple, fontSize = 12.sp, fontFamily = PixelFont)
+                            } else {
+                                Text("Unlocked", color = Color(0xFF3CD250), fontSize = 12.sp, fontFamily = PixelFont)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", fontFamily = PixelFont)
+            }
+        }
+    )
 }

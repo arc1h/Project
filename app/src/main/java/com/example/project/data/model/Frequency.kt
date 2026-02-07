@@ -9,15 +9,16 @@ sealed class Frequency {
     abstract fun toDisplayString(): String
     abstract fun getTypeName(): String
 
-    // FIX 1: Move this OUT of the sealed class body or
-    // simply make it a regular abstract function/normal function
     fun toStorageString(): String {
-        return when (this) {
+        val type = when (this) {
             is Hourly -> "HOURLY"
             is Daily -> "DAILY"
             is Weekly -> "WEEKLY"
             is Monthly -> "MONTHLY"
         }
+        // Format: TYPE|INTERVAL|DAYS
+        val days = daysOfWeek?.joinToString(",") { it.name } ?: "NONE"
+        return "$type|$interval|$days"
     }
 
     open val daysOfWeek: Set<DayOfWeek>? = null
@@ -60,14 +61,25 @@ sealed class Frequency {
     }
 
     companion object {
-        // FIX 2: Add this so Frequency.fromStorageString(val) works!
         fun fromStorageString(value: String): Frequency {
-            return when (value.uppercase()) {
-                "HOURLY" -> Hourly()
-                "DAILY" -> Daily()
-                "WEEKLY" -> Weekly()
-                "MONTHLY" -> Monthly()
-                else -> Daily() // Safe fallback
+            return try {
+                val parts = value.split("|")
+                val type = parts[0]
+                val interval = parts.getOrNull(1)?.toInt() ?: 1
+                val daysStr = parts.getOrNull(2)
+
+                val days = if (daysStr == null || daysStr == "NONE") null
+                else daysStr.split(",").map { DayOfWeek.valueOf(it) }.toSet()
+
+                when (type) {
+                    "HOURLY" -> Hourly(interval)
+                    "DAILY" -> Daily(interval, days)
+                    "WEEKLY" -> Weekly(interval, days)
+                    "MONTHLY" -> Monthly(interval)
+                    else -> Daily(1)
+                }
+            } catch (e: Exception) {
+                Daily(1) // Fallback on error
             }
         }
 
