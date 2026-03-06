@@ -1,5 +1,6 @@
 package com.example.project.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,7 +82,14 @@ fun History(navController: NavController) {
                 .collection("logs")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener { snapshot, error ->
-                    if (error == null && snapshot != null) {
+                    if (error != null) {
+                        Log.e("HistoryScreen", "Error loading history logs", error)
+                        isLoading = false
+                        return@addSnapshotListener
+                    }
+
+                    if (snapshot != null) {
+                        Log.d("HistoryScreen", "Loaded ${snapshot.size()} logs from Firestore.")
                         habitLogs = snapshot.documents.map { doc ->
                             HabitLog(
                                 id = doc.id,
@@ -90,7 +98,6 @@ fun History(navController: NavController) {
                                     .format(doc.getTimestamp("timestamp")?.toDate() ?: Date()),
                                 xpGained = doc.getLong("xpGained")?.toInt() ?: 0,
                                 coinsGained = doc.getLong("coinsGained")?.toInt() ?: 0,
-                                // Ensure this key "difficulty" matches exactly what you put in the transaction hashmap
                                 difficulty = doc.getString("difficulty") ?: "Easy"
                             )
                         }
@@ -133,9 +140,6 @@ fun History(navController: NavController) {
                 .padding(padding)
                 .padding(horizontal = 24.dp)
         ) {
-            // Note: The manual "History" Text and Spacer have been removed
-            // as they are now part of the topBar.
-
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -143,7 +147,7 @@ fun History(navController: NavController) {
             } else if (habitLogs.isEmpty()) {
                 HistoryEmptyState()
             } else {
-                Spacer(modifier = Modifier.height(8.dp)) // Slight gap before the list starts
+                Spacer(modifier = Modifier.height(8.dp))
 
                 LazyColumn(
                     modifier = Modifier.weight(1f),

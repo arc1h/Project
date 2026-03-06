@@ -1,5 +1,6 @@
 package com.example.project.ui.screens.components
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +66,8 @@ fun HabitCard(
     val subtextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
 
     val isDoneNow = habit.isDoneNow()
+    val prefs = LocalContext.current.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+    val needsConfirmation = prefs.getBoolean("confirm_delete", true)
 
     Card(
         modifier = Modifier
@@ -165,7 +168,11 @@ fun HabitCard(
                             text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
                             onClick = {
                                 menuExpanded = false
-                                showDeleteDialog = true
+                                if (needsConfirmation) {
+                                    showDeleteDialog = true // Show the popup
+                                } else {
+                                    onDelete() // Delete immediately
+                                }
                             }
                         )
                     }

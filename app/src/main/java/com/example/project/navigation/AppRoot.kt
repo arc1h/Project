@@ -22,6 +22,7 @@ import com.example.project.data.viewmodel.UserViewModel
 import com.example.project.ui.screens.AccountDetails
 import com.example.project.ui.screens.AccountScreen
 import com.example.project.ui.screens.AppSettings
+import com.example.project.ui.screens.FriendHero
 import com.example.project.ui.screens.HabitsScreen
 import com.example.project.ui.screens.HeroScreen
 import com.example.project.ui.screens.History
@@ -121,6 +122,11 @@ fun AppRoot() {
                     heroViewModel = heroViewModel,
                     navController = navController
                 )
+            }
+
+            composable("friend_hero/{friendUid}") { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("friendUid") ?: ""
+                FriendHero(navController, id)
             }
 
             composable("shop") {

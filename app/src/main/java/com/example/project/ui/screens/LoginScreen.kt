@@ -33,7 +33,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.project.data.model.Challenge
-import com.example.project.data.model.Hero
 import com.example.project.navigation.Screen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -54,15 +53,22 @@ fun LoginScreen(
     var loading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    fun initializeHero(userId: String) {
+    fun initializeNewUser(userId: String, username: String, email: String, onComplete: (Boolean) -> Unit) {
         val userRef = db.collection("users").document(userId)
 
-        // Create hero stats
-        val newHero = Hero(userId = userId)
-        userRef.collection("hero").document("stats").set(newHero)
+        val userData = hashMapOf(
+            "username" to username,
+            "email" to email,
+            "uid" to userId,
+            "xp" to 0,
+            "coins" to 0,
+            "level" to 0,
+            "char" to "0",
+            "challengesCompleted" to 0,
+            "longestStreak" to 0
+        )
 
-        // Create default challenges
-        val defaultChallenges = listOf(
+        val challenges = listOf(
             Challenge(
                 title = "Achieve a streak of 4 days",
                 description = "Complete habits for 4 consecutive days",
@@ -86,14 +92,21 @@ fun LoginScreen(
             )
         )
 
-        val challengesRef = userRef
-            .collection("hero")
-            .document("challenges")
-            .collection("active")
+        val batch = db.batch()
+        batch.set(userRef, userData)
 
-        defaultChallenges.forEach { challenge ->
-            challengesRef.add(challenge)
+        val challengesRef = userRef.collection("challenges")
+        challenges.forEach { challenge ->
+            val newChallengeRef = challengesRef.document()
+            batch.set(newChallengeRef, challenge)
         }
+
+        batch.commit()
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener {
+                errorMessage = "Failed to initialize user: ${it.message}"
+                onComplete(false)
+            }
     }
 
     fun handleAuth() {
@@ -101,10 +114,13 @@ fun LoginScreen(
         errorMessage = null
 
         if (isLoginMode) {
-            // LOGIN
-            db.collection("users")
-                .whereEqualTo("username", username)
-                .get()
+            val isEmail = username.contains("@")
+            val query = if (isEmail) {
+                db.collection("users").whereEqualTo("email", username)
+            } else {
+                db.collection("users").whereEqualTo("username", username)
+            }
+            query.get()
                 .addOnSuccessListener { result ->
                     if (!result.isEmpty) {
                         val userEmail = result.documents[0].getString("email")
@@ -127,46 +143,48 @@ fun LoginScreen(
                         }
                     } else {
                         loading = false
-                        errorMessage = "Username not found"
+                        errorMessage = if (isEmail) "Email not found" else "Username not found"
+                    }
+                }
+                .addOnFailureListener { e ->
+                    loading = false
+                    errorMessage = "Error: ${e.message}"
+                }
+
+        } else {
+            // REGISTER: First check if username is already taken in Firestore
+            db.collection("users").whereEqualTo("username", username).get()
+                .addOnSuccessListener { usernameResult ->
+                    if (!usernameResult.isEmpty) {
+                        loading = false
+                        errorMessage = "Username is already taken"
+                    } else {
+                        // Username is free, now create the Auth account
+                        auth.createUserWithEmailAndPassword(email, password)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    val userId = task.result?.user?.uid ?: return@addOnCompleteListener
+                                    
+                                    // Initialize user and WAIT for completion before navigating
+                                    initializeNewUser(userId, username, email) { success ->
+                                        loading = false
+                                        if (success) {
+                                            onLoginSuccess()
+                                            navController.navigate(Screen.Habits.route) {
+                                                popUpTo(Screen.Login.route) { inclusive = true }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    loading = false
+                                    errorMessage = task.exception?.message ?: "Registration failed"
+                                }
+                            }
                     }
                 }
                 .addOnFailureListener {
                     loading = false
-                    errorMessage = "Error: ${it.message}"
-                }
-
-        } else {
-            // REGISTER
-            auth.createUserWithEmailAndPassword(email, password)
-                .addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        val userId = task.result?.user?.uid ?: return@addOnCompleteListener
-
-                        val userData = hashMapOf(
-                            "username" to username,
-                            "email" to email,
-                            "uid" to userId
-                        )
-
-                        db.collection("users").document(userId).set(userData)
-                            .addOnSuccessListener {
-                                // Initialize hero automatically
-                                initializeHero(userId)
-
-                                loading = false
-                                onLoginSuccess()
-                                navController.navigate(Screen.Habits.route) {
-                                    popUpTo(Screen.Login.route) { inclusive = true }
-                                }
-                            }
-                            .addOnFailureListener { e ->
-                                loading = false
-                                errorMessage = "Failed to save user: ${e.message}"
-                            }
-                    } else {
-                        loading = false
-                        errorMessage = task.exception?.message ?: "Registration failed"
-                    }
+                    errorMessage = "Error checking username: ${it.message}"
                 }
         }
     }
@@ -216,7 +234,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Username") },
+                    label = { Text("Username or Email") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

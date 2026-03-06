@@ -115,25 +115,23 @@ fun ProgressScreen(
     var isUploading by remember { mutableStateOf(false) }
 
     // --- REACTIVE STATS CALCULATION ---
-    val stats by remember(habits, hero, globalLongestRecord) {
+    val stats by remember(habits, hero) { // Remove globalLongestRecord, use hero
         derivedStateOf {
-            // 1. Longest Streak: Simple enough.
             val bestHabit = habits.maxByOrNull { it.streak }
 
-            // 2. Shortest Streak: Only look at habits that the user has actually started (streak > 0).
-            // If no habits have a streak, we fall back to the first habit or "No data".
-            val startedHabits = habits.filter { it.streak > 0 }
-            val worstHabit = startedHabits.minByOrNull { it.streak }
-                ?: habits.firstOrNull()
+            // Use the real-time streak from the hero listener
+            val currentGlobalRecord = hero?.longestStreak ?: 0
 
-            // 3. Most Skipped: Only count habits that have actually been skipped at least once.
-            // This prevents a brand new habit from being labeled "Most Skipped" with 0 days.
+            val startedHabits = habits.filter { it.streak > 0 }
+            val worstHabit = startedHabits.minByOrNull { it.streak } ?: habits.firstOrNull()
+
             val skippedHabit = habits.filter { it.skippedCount > 0 }
                 .maxByOrNull { it.skippedCount }
 
             ProgressStats(
+                // Logic: Use whichever is higher—the current habit's streak or the saved record
                 longestStreakHabit = bestHabit?.name ?: "No Habit",
-                longestStreakDays = maxOf(globalLongestRecord, bestHabit?.streak ?: 0),
+                longestStreakDays = maxOf(currentGlobalRecord, bestHabit?.streak ?: 0),
 
                 shortestStreakHabit = worstHabit?.name ?: "No Habit",
                 shortestStreakDays = worstHabit?.streak ?: 0,
@@ -219,21 +217,22 @@ fun ProgressScreen(
 
                 // TOP ROW
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val bestFreq = habits.find { it.name == stats.longestStreakHabit }?.frequency?.getTypeName() ?: ""
+                    // Find the actual habit object to get its frequency type
+                    val longestHabitObj = habits.find { it.name == stats.longestStreakHabit }
                     StatCard(
                         title = "Longest Streak",
                         value = "${stats.longestStreakDays}",
                         habitName = stats.longestStreakHabit,
-                        frequency = bestFreq,
+                        frequency = longestHabitObj?.frequency?.getTypeName() ?: "daily", // Fix: pass lowercase type
                         modifier = Modifier.weight(1f)
                     )
 
-                    val worstFreq = habits.find { it.name == stats.shortestStreakHabit }?.frequency?.getTypeName() ?: ""
+                    val shortestHabitObj = habits.find { it.name == stats.shortestStreakHabit }
                     StatCard(
                         title = "Shortest Streak",
                         value = "${stats.shortestStreakDays}",
                         habitName = stats.shortestStreakHabit,
-                        frequency = worstFreq,
+                        frequency = shortestHabitObj?.frequency?.getTypeName() ?: "daily",
                         modifier = Modifier.weight(1f)
                     )
                 }

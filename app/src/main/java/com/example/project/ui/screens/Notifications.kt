@@ -2,13 +2,17 @@ package com.example.project.ui.screens
 
 import android.app.TimePickerDialog
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,8 +24,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.project.data.util.acceptFriendRequest
+import com.example.project.data.util.cancelFriendRequest
+import com.example.project.data.util.declineFriendRequest
 import com.example.project.data.util.scheduleHabitAlarm
 import com.example.project.data.viewmodel.UserViewModel
+import com.example.project.ui.theme.LightGray
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
@@ -61,12 +69,18 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
         mutableStateOf(prefs.getString("reminder_time", "Not Set") ?: "Not Set")
     }
 
+    val isMasterEnabled = prefs.getBoolean("notifications_enabled", true)
+
     val timePickerDialog = TimePickerDialog(context, { _, hour, minute ->
-        val formattedTime = String.format("%02d:%02d", hour, minute)
-        reminderTime = formattedTime
-        prefs.edit().putString("reminder_time", formattedTime).apply()
-        scheduleHabitAlarm(context, "Daily Reminder", hour, minute)
-        Toast.makeText(context, "Daily reminder set for $formattedTime", Toast.LENGTH_SHORT).show()
+        if (!isMasterEnabled) {
+            Toast.makeText(context, "Enable 'Master Notifications' in Settings first!", Toast.LENGTH_LONG).show()
+        } else {
+            val formattedTime = String.format("%02d:%02d", hour, minute)
+            reminderTime = formattedTime
+            prefs.edit().putString("reminder_time", formattedTime).apply()
+            scheduleHabitAlarm(context, "Daily Reminder", hour, minute)
+            Toast.makeText(context, "Daily reminder set for $formattedTime", Toast.LENGTH_SHORT).show()
+        }
     }, 12, 0, false)
 
     DisposableEffect(currentUserId) {
@@ -97,16 +111,25 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
             val userDocReg = firestore.collection("users").document(currentUserId)
                 .addSnapshotListener { snapshot, _ ->
                     val requestIds = snapshot?.get("receivedFriendRequests") as? List<String> ?: emptyList()
-                    scope.launch {
-                        val updatedList = requestIds.map { id ->
-                            // Fetching the document for each ID to get the 'username' field
-                            val userDoc = firestore.collection("users").document(id).get().await()
-                            FriendRequest(
-                                requesterId = id,
-                                requesterUsername = userDoc.getString("username") ?: "Unknown User"
-                            )
+
+                    if (requestIds.isEmpty()) {
+                        friendRequests = emptyList()
+                    } else {
+                        scope.launch {
+                            val updatedList = mutableListOf<FriendRequest>()
+                            for (id in requestIds) {
+                                try {
+                                    val userDoc = firestore.collection("users").document(id).get().await()
+                                    updatedList.add(FriendRequest(
+                                        requesterId = id,
+                                        requesterUsername = userDoc.getString("username") ?: "Unknown User"
+                                    ))
+                                } catch (e: Exception) {
+                                    Log.e("Notifs", "Error fetching user $id", e)
+                                }
+                            }
+                            friendRequests = updatedList
                         }
-                        friendRequests = updatedList
                     }
                 }
 
@@ -200,9 +223,34 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // 1. Friend Requests Section
                     items(friendRequests) { request ->
-                        FriendRequestCard(request, {}, {})
+                        FriendRequestCard(
+                            request = request,
+                            onAccept = {
+                                scope.launch {
+                                    currentUserId?.let { uid ->
+                                        // Call your utility function
+                                        acceptFriendRequest(uid, request.requesterId)
+                                        // The SnapshotListener in Notifications.kt will
+                                        // automatically refresh the list for us!
+                                        Toast.makeText(context, "Friend request accepted!", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            onDecline = {
+                                scope.launch {
+                                    currentUserId?.let { uid ->
+                                        // Use the correct semantic function
+                                        declineFriendRequest(uid, request.requesterId)
+                                        Toast.makeText(context, "Request declined", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        )
                     }
+
+                    // 2. Habit History Notifications Section
                     items(inAppNotifications) { notification ->
                         NotificationHistoryCard(notification)
                     }
@@ -230,18 +278,29 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
 
 @Composable
 fun NotificationHistoryCard(notification: InAppNotification) {
+    val isNudge = notification.type == "NUDGE"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = if (isNudge)
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
+        border = if (isNudge) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary) else null,
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            //
+            Icon(
+                imageVector = if (isNudge) Icons.Default.Favorite else Icons.Default.Notifications,
+                contentDescription = null,
+                tint = if (isNudge) MaterialTheme.colorScheme.secondary else Color.Gray,
+                modifier = Modifier.size(24.dp).padding(end = 12.dp)
+            )
             Column {
                 Text(notification.title, style = MaterialTheme.typography.bodyLarge)
                 Text(notification.timestamp, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
@@ -254,14 +313,15 @@ fun NotificationHistoryCard(notification: InAppNotification) {
 fun FriendRequestCard(request: FriendRequest, onAccept: () -> Unit, onDecline: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, LightGray),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "${request.requesterUsername} sent you a friend request",
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -277,7 +337,8 @@ fun FriendRequestCard(request: FriendRequest, onAccept: () -> Unit, onDecline: (
                     onClick = onDecline,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
                 ) {
                     Text("Decline")
                 }

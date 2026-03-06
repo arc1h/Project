@@ -22,96 +22,78 @@ import com.example.project.ui.theme.LightGray
 import com.example.project.ui.theme.Purple
 import com.example.project.ui.theme.ThemeMode
 
-@OptIn(ExperimentalMaterial3Api::class) // Added for TopAppBar
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppSettings(
     navController: NavController,
     currentThemeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit
 ) {
-    var notificationsEnabled by remember { mutableStateOf(true) }
-    var confirmDelete by remember { mutableStateOf(true) }
-    var showAnimations by remember { mutableStateOf(true) }
-
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("prefs", Context.MODE_PRIVATE) }
+
+    // READ PREFERENCES
+    var notificationsEnabled by remember {
+        mutableStateOf(prefs.getBoolean("notifications_enabled", true))
+    }
+    var confirmDelete by remember {
+        mutableStateOf(prefs.getBoolean("confirm_delete", true))
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "App Settings",
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-                    )
-                },
+                title = { Text("App Settings", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
-                )
+                }
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 24.dp)
-        ) {
-            // Note: Removed the manual Title Text and Spacer(24.dp)
-            // as they are now handled by the TopAppBar
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(24.dp)) {
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
-            ) {
                 item {
+                    Spacer(modifier = Modifier.height(16.dp))
                     SettingsSection(title = "Appearance") {
-                        ThemeSelector(
-                            selectedMode = currentThemeMode,
-                            onModeSelected = onThemeModeChange
-                        )
+                        ThemeSelector(selectedMode = currentThemeMode, onModeSelected = onThemeModeChange)
                     }
                 }
 
                 item {
+                    Spacer(modifier = Modifier.height(16.dp))
                     SettingsSection(title = "Notifications") {
                         SettingsToggle(
-                            title = "Enable notifications",
+                            title = "Master Notifications",
+                            // This acts as a global kill-switch for reminders
                             checked = notificationsEnabled,
-                            onCheckedChange = { notificationsEnabled = it }
+                            onCheckedChange = {
+                                notificationsEnabled = it
+                                prefs.edit().putBoolean("notifications_enabled", it).apply()
+                            }
                         )
                     }
                 }
 
                 item {
+                    Spacer(modifier = Modifier.height(16.dp))
                     SettingsSection(title = "Habits & UX") {
                         SettingsToggle(
-                            title = "Confirm before deleting habits",
+                            title = "Confirm before deleting",
                             checked = confirmDelete,
-                            onCheckedChange = { confirmDelete = it }
-                        )
-
-                        SettingsToggle(
-                            title = "Show streak animations",
-                            checked = showAnimations,
-                            onCheckedChange = { showAnimations = it }
+                            onCheckedChange = {
+                                confirmDelete = it
+                                prefs.edit().putBoolean("confirm_delete", it).apply()
+                            }
                         )
                     }
                 }
 
                 item {
+                    Spacer(modifier = Modifier.height(16.dp))
                     SettingsSection(title = "App") {
                         Text(
                             text = "Version 1.0.0",
@@ -127,7 +109,6 @@ fun AppSettings(
                                 onThemeModeChange(ThemeMode.SYSTEM)
                                 notificationsEnabled = true
                                 confirmDelete = true
-                                showAnimations = true
                                 Toast.makeText(context, "Preferences Reset", Toast.LENGTH_SHORT).show()
                             },
                             contentPadding = PaddingValues(0.dp) // Aligns text to left
@@ -138,6 +119,7 @@ fun AppSettings(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
@@ -240,4 +222,3 @@ fun ThemeOption(
         )
     }
 }
-

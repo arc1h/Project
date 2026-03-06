@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.project.data.model.Frequency
@@ -97,17 +98,19 @@ fun HabitsScreen(
     val listState = rememberLazyListState()
     val shouldHideFab by remember {
         derivedStateOf {
-            val isScrollingDown = listState.firstVisibleItemScrollOffset > 0 || listState.firstVisibleItemIndex > 0
+            // 1. If the list is too short to even scroll, always show the FAB
+            val canScroll = listState.canScrollForward || listState.canScrollBackward
+            if (!canScroll) return@derivedStateOf false
 
-            // We hide it if:
-            // - We are at the very bottom (can't scroll forward anymore)
-            // - OR we are currently actively scrolling down
+            // 2. Identify scroll direction and position
+            val isScrollingDown = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
             val isAtBottom = !listState.canScrollForward
+
+            // 3. Only hide if actively moving down OR at the very bottom of a long list
             val isMovingDown = listState.isScrollInProgress &&
                     listState.firstVisibleItemIndex >= (listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0)
 
-            // Reappear only if scrolling UP or at the very top
-            isAtBottom || (isScrollingDown && isMovingDown)
+            (isAtBottom || isMovingDown) && isScrollingDown
         }
     }
 
@@ -143,8 +146,9 @@ fun HabitsScreen(
             }
         },
         floatingActionButton = {
+            val visible = habits.isEmpty() || !shouldHideFab
             AnimatedVisibility(
-                visible = !shouldHideFab,
+                visible = visible,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut()
             ) {
@@ -169,7 +173,21 @@ fun HabitsScreen(
                     CircularProgressIndicator()
                 }
             } else if (habits.isEmpty()) {
-                // Empty state UI...
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No habits.. :(",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Click the + button to add one!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     state = listState,
@@ -182,7 +200,7 @@ fun HabitsScreen(
                             habit = habit,
                             // Inside HabitsScreen.kt -> onChecked block
                             onChecked = {
-                                habitViewModel.toggleHabit(habit)
+                                habitViewModel.markHabitAsDone(habit)
 
                                 // 1. General Progress (Consistency Star)
                                 heroViewModel.incrementChallengeProgress("habit_completed")

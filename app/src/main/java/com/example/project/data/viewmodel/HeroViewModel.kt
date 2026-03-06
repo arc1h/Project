@@ -9,6 +9,7 @@ import com.example.project.data.model.Hero
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
@@ -28,7 +29,7 @@ val CHALLENGE_POOL = listOf(
     ),
     Challenge(
         title = "Hard Mode",
-        description = "No pain, no gain. Conquer 2 habits marked as 'Hard' difficulty.",
+        description = "No pain, no gain. Conquer 2 habits marked as \'Hard\' difficulty.",
         goal = 2, xpReward = 600, coinReward = 100
     ),
     Challenge(
@@ -53,9 +54,7 @@ class HeroViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val firestore = Firebase.firestore
 
-    // FIX: Define the private backing property
     private var _hero = mutableStateOf<Hero?>(null)
-    // The public read-only version
     var hero: androidx.compose.runtime.State<Hero?> = _hero
 
     var activeChallenges = mutableStateOf<List<Challenge>>(emptyList())
@@ -64,71 +63,52 @@ class HeroViewModel : ViewModel() {
     var isLoading = mutableStateOf(false)
         private set
 
+    private var heroListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
+    private var challengesListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
+
     init {
         refresh()
-        // We launch a coroutine to handle the sequence correctly
+        runOneTimeDataMigration()
+    }
+
+    fun refresh() {
+        val uid = auth.currentUser?.uid ?: return
+
+        heroListenerRegistration?.remove()
+
+        heroListenerRegistration = firestore.collection("users").document(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("HeroVM", "Hero listener failed", error)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    _hero.value = snapshot.toHero()
+                }
+            }
+
+        // Fetch challenges properly when a user logs in / refreshes
         viewModelScope.launch {
             syncWeeklyChallenges()
             loadActiveChallenges()
         }
     }
 
-    fun refresh() {
-        val uid = auth.currentUser?.uid ?: return
+    private fun DocumentSnapshot.toHero(): Hero {
+        val xp = getLong("xp")?.toInt() ?: 0
+        val coins = getLong("coins")?.toInt() ?: 0
+        val calculatedLevel = xp / 1000
 
-        // This MUST be a snapshot listener, not a .get().await()
-        firestore.collection("users").document(uid)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-
-                if (snapshot != null && snapshot.exists()) {
-                    // This triggers the UI to recompose
-                    _hero.value = snapshot.toHero()
-                    Log.d("HERO_VM", "UI Refreshing: Longest Streak is now ${_hero.value?.longestStreak}")
-                }
-            }
-    }
-
-    fun DocumentSnapshot.toHero(): Hero {
         return Hero(
             userId = id,
-            level = getLong("level")?.toInt() ?: 1,
-            xp = getLong("xp")?.toInt() ?: 0,
-            char = getString("char") ?: "0", // Default to "0"
+            level = calculatedLevel,
+            xp = xp,
+            coins = coins,
+            char = getString("char") ?: "0",
             challengesCompleted = getLong("challengesCompleted")?.toInt() ?: 0,
             longestStreak = getLong("longestStreak")?.toInt() ?: 0,
         )
-    }
-
-    private fun loadHeroData() {
-        val userId = auth.currentUser?.uid ?: return
-        isLoading.value = true
-
-        viewModelScope.launch {
-            try {
-                // Path Fix: Get data directly from the user document
-                val heroDoc = db.collection("users")
-                    .document(userId)
-                    .get()
-                    .await()
-
-                if (heroDoc.exists()) {
-                    // Use .value to update the state within the 'val'
-                    _hero.value = heroDoc.toObject(Hero::class.java)
-                } else {
-                    val newHero = Hero(userId = userId)
-                    db.collection("users")
-                        .document(userId)
-                        .set(newHero)
-                        .await()
-                    _hero.value = newHero
-                }
-            } catch (e: Exception) {
-                Log.e("HeroVM", "Error loading hero: ${e.message}")
-            } finally {
-                isLoading.value = false
-            }
-        }
     }
 
     private fun getCurrentWeekOfYear(): Int = Calendar.getInstance().get(Calendar.WEEK_OF_YEAR)
@@ -136,12 +116,13 @@ class HeroViewModel : ViewModel() {
     private fun loadActiveChallenges() {
         val userId = auth.currentUser?.uid ?: return
 
-        firestore.collection("users").document(userId)
+        challengesListenerRegistration?.remove()
+
+        challengesListenerRegistration = firestore.collection("users").document(userId)
             .collection("challenges")
-            .whereEqualTo("completed", false) // Changed from "isCompleted" to "completed"
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.e("HeroVM", "Listen failed.", error)
+                    Log.e("HeroVM", "Challenges listener failed.", error)
                     return@addSnapshotListener
                 }
 
@@ -149,7 +130,6 @@ class HeroViewModel : ViewModel() {
                     val challengeList = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Challenge::class.java)?.copy(id = doc.id)
                     }
-                    Log.d("HeroVM", "Challenges found: ${challengeList.size}")
                     activeChallenges.value = challengeList
                 }
             }
@@ -165,28 +145,21 @@ class HeroViewModel : ViewModel() {
                 val userDoc = userRef.get().await()
                 val lastSyncedWeek = userDoc.getLong("lastSyncedWeek")?.toInt() ?: -1
 
-                // FORCE SYNC: Change the check to see if the week is different
-                // If you want to force it right now to see them, use: if (true)
                 if (lastSyncedWeek != currentWeek) {
-                    Log.d("HeroVM", "New week detected. Generating challenges...")
                     val newChallenges = CHALLENGE_POOL.shuffled().take(2)
+                    val challengesRef = userRef.collection("challenges")
 
-                    // 1. Clear old active challenges
-                    val oldChallenges = userRef.collection("challenges").get().await()
+                    val oldChallenges = challengesRef.get().await()
                     val batch = firestore.batch()
                     oldChallenges.documents.forEach { batch.delete(it.reference) }
 
-                    // 2. Add new ones
                     newChallenges.forEach { challenge ->
-                        val newRef = userRef.collection("challenges").document()
-                        // IMPORTANT: Ensure isCompleted is false
+                        val newRef = challengesRef.document()
                         batch.set(newRef, challenge.copy(id = newRef.id, isCompleted = false))
                     }
 
-                    // 3. Update the week tracker
                     batch.update(userRef, "lastSyncedWeek", currentWeek)
                     batch.commit().await()
-                    Log.d("HeroVM", "Batch commit successful")
                 }
             } catch (e: Exception) {
                 Log.e("HeroVM", "Sync failed: ${e.message}")
@@ -196,24 +169,20 @@ class HeroViewModel : ViewModel() {
 
     fun addXP(amount: Int) {
         val userId = auth.currentUser?.uid ?: return
-        val currentHero = _hero.value ?: return
-
         viewModelScope.launch {
             try {
-                val newXP = currentHero.xp + amount
-                val newLevel = (newXP / 1000) + 1
+                firestore.runTransaction {
+                    val userRef = firestore.collection("users").document(userId)
+                    val snapshot = it.get(userRef)
+                    val currentXp = snapshot.getLong("xp") ?: 0L
+                    val newXp = currentXp + amount
+                    val newLevel = newXp / 1000
 
-                db.collection("users")
-                    .document(userId)
-                    .update(
-                        mapOf(
-                            "xp" to newXP,
-                            "level" to newLevel
-                        )
-                    ).await()
-
-                // Local state update
-                _hero.value = currentHero.copy(xp = newXP, level = newLevel)
+                    it.update(userRef, mapOf(
+                        "xp" to newXp,
+                        "level" to newLevel
+                    ))
+                }.await()
             } catch (e: Exception) {
                 Log.e("HeroVM", "Error adding XP: ${e.message}")
             }
@@ -222,64 +191,47 @@ class HeroViewModel : ViewModel() {
 
     fun addCoins(amount: Int) {
         val userId = auth.currentUser?.uid ?: return
-        val currentHero = _hero.value ?: return
-
         viewModelScope.launch {
             try {
-                val newCoins = currentHero.coins + amount
-
-                db.collection("users")
-                    .document(userId)
-                    .update("coins", newCoins)
+                db.collection("users").document(userId)
+                    .update("coins", FieldValue.increment(amount.toLong()))
                     .await()
-
-                _hero.value = currentHero.copy(coins = newCoins)
             } catch (e: Exception) {
                 Log.e("HeroVM", "Error adding coins: ${e.message}")
             }
         }
     }
 
-    private fun calculateLevel(xp: Int): Int {
-        return (Math.sqrt(xp / 100.0).toInt()) + 1
-    }
-
     fun completeChallenge(challenge: Challenge) {
         val userId = auth.currentUser?.uid ?: return
-        val currentHero = _hero.value ?: return
 
         viewModelScope.launch {
             try {
-                db.collection("users")
-                    .document(userId)
-                    .collection("challenges")
-                    .document(challenge.id)
-                    .update(
-                        mapOf(
-                            "completed" to true,       // Matches @PropertyName
-                            "progress" to challenge.goal // Visual fill
-                        )
-                    ).await()
+                firestore.runTransaction { transaction ->
+                    val userRef = firestore.collection("users").document(userId)
+                    val challengeRef = userRef.collection("challenges").document(challenge.id)
 
-                // Calculate new stats
-                val newXP = currentHero.xp + challenge.xpReward
-                val newCoins = currentHero.coins + challenge.coinReward
-                val newChallengesCompleted = currentHero.challengesCompleted + 1
-                val newLevel = calculateLevel(newXP)
+                    transaction.update(challengeRef, mapOf(
+                        "completed" to true,
+                        "progress" to challenge.goal
+                    ))
 
-                // Update user stats
-                db.collection("users").document(userId).update(
-                    mapOf(
-                        "xp" to newXP,
+                    val userSnapshot = transaction.get(userRef)
+                    val currentXp = userSnapshot.getLong("xp") ?: 0L
+                    val currentCoins = userSnapshot.getLong("coins") ?: 0L
+                    val challengesCompleted = userSnapshot.getLong("challengesCompleted") ?: 0L
+
+                    val newXp = currentXp + challenge.xpReward
+                    val newLevel = newXp / 1000
+                    val newCoins = currentCoins + challenge.coinReward
+
+                    transaction.update(userRef, mapOf(
+                        "xp" to newXp,
+                        "level" to newLevel,
                         "coins" to newCoins,
-                        "challengesCompleted" to newChallengesCompleted,
-                        "level" to newLevel
-                    )
-                ).await()
-
-                // Refresh the list to remove the completed card
-                loadActiveChallenges()
-
+                        "challengesCompleted" to challengesCompleted + 1
+                    ))
+                }.await()
             } catch (e: Exception) {
                 Log.e("HeroVM", "Error completing challenge: ${e.message}")
             }
@@ -289,76 +241,87 @@ class HeroViewModel : ViewModel() {
     fun updateHeroAppearance(charId: String) {
         val uid = auth.currentUser?.uid ?: return
         firestore.collection("users").document(uid)
-            .update("char", charId) // charId would be "0", "1", "2" etc.
-            .addOnSuccessListener {
-                Log.d("HERO_VM", "Appearance updated to $charId")
+            .update("char", charId)
+            .addOnFailureListener {
+                Log.e("HERO_VM", "Appearance update failed", it)
             }
     }
 
-    fun checkRepeatingChallenges(uid: String) {
-        val challengesRef = firestore.collection("users").document(uid).collection("challenges")
-
-        challengesRef.whereEqualTo("type", "REPEATING_HABITS").get().addOnSuccessListener { snapshot ->
-            for (doc in snapshot.documents) {
-                val progress = doc.getLong("progress") ?: 0L
-                val goal = doc.getLong("goal") ?: 5L
-
-                val newProgress = progress + 1
-
-                if (newProgress >= goal) {
-                    // 1. Give Bonus
-                    addXP(500) // Huge bonus for finishing the challenge
-                    // 2. Reset Progress to 0 instead of deleting
-                    doc.reference.update("progress", 0)
-                } else {
-                    doc.reference.update("progress", newProgress)
-                }
-            }
-        }
-    }
-
-    // In HeroViewModel.kt
     fun incrementChallengeProgress(challengeType: String) {
         val userId = auth.currentUser?.uid ?: return
 
         viewModelScope.launch {
             try {
-                val challenges = firestore.collection("users")
-                    .document(userId)
+                val snapshot = firestore.collection("users").document(userId)
                     .collection("challenges")
-                    // Ensure this matches the field name in your Firestore DB
                     .whereEqualTo("completed", false)
                     .get()
                     .await()
 
-                Log.d("HeroVM", "Found ${challenges.size()} active challenges to check")
+                for (doc in snapshot.documents) {
+                    val challenge = doc.toObject(Challenge::class.java)?.copy(id = doc.id) ?: continue
 
-                challenges.documents.forEach { doc ->
-                    val challenge = doc.toObject(Challenge::class.java)?.copy(id = doc.id) ?: return@forEach
-
-                    // Use 'challengeType' here to match the parameter above
-                    val shouldIncrement = when (challengeType) {
-                        "habit_completed" -> challenge.title.contains("Star", ignoreCase = true)
+                    val isMatch = when (challengeType) {
+                        "habit_completed" -> challenge.title.contains("Consistency", ignoreCase = true)
                         "morning_habit" -> challenge.title.contains("Bird", ignoreCase = true)
-                        "hard_habit" -> challenge.title.contains("Hard", ignoreCase = true) // <--- This looks for the word "Hard"
+                        "hard_habit" -> challenge.title.contains("Hard", ignoreCase = true)
                         "streak" -> challenge.title.contains("Streak", ignoreCase = true)
                         else -> false
                     }
 
-                    if (shouldIncrement) {
+                    if (isMatch) {
                         val newProgress = challenge.progress + 1
                         if (newProgress >= challenge.goal) {
-                            // Trigger completion if goal is hit
                             completeChallenge(challenge.copy(progress = newProgress))
                         } else {
-                            // Update the specific field name "progress"
-                            doc.reference.update("progress", newProgress).await()
+                            doc.reference.update("progress", newProgress)
                         }
+                        break
                     }
                 }
             } catch (e: Exception) {
                 Log.e("HeroVM", "Error updating progress: ${e.message}")
             }
         }
+    }
+
+    private fun runOneTimeDataMigration() {
+        viewModelScope.launch {
+            try {
+                Log.d("MIGRATION", "Starting user data migration...")
+                val usersRef = firestore.collection("users")
+                val snapshot = usersRef.get().await()
+                val batch = firestore.batch()
+                var migrationCount = 0
+
+                for (doc in snapshot.documents) {
+                    val currentXp = doc.getLong("xp") ?: 0L
+                    val currentLevel = doc.getLong("level") ?: 0L
+                    val correctLevel = currentXp / 1000
+
+                    if (currentLevel != correctLevel) {
+                        migrationCount++
+                        val userRef = usersRef.document(doc.id)
+                        batch.update(userRef, "level", correctLevel)
+                        Log.d("MIGRATION", "User ${doc.id}: Stale level $currentLevel, correcting to $correctLevel")
+                    }
+                }
+
+                if (migrationCount > 0) {
+                    batch.commit().await()
+                    Log.d("MIGRATION", "Successfully migrated $migrationCount users.")
+                } else {
+                    Log.d("MIGRATION", "No users needed migration.")
+                }
+            } catch (e: Exception) {
+                Log.e("MIGRATION", "Data migration failed: ${e.message}")
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        heroListenerRegistration?.remove()
+        challengesListenerRegistration?.remove()
     }
 }

@@ -17,16 +17,21 @@ class NotificationWorker : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val habitName = intent.getStringExtra("HABIT_NAME") ?: "Habit Reminder"
 
-        // 1. Show the visual notification
-        showNotification(context, habitName)
+        // 1. Check the Master Switch from AppSettings
+        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        val isMasterNotificationsEnabled = prefs.getBoolean("notifications_enabled", true)
 
-        // 2. Async Firestore Write
+        // 2. Only show visual alert if Master Switch is ON
+        if (isMasterNotificationsEnabled) {
+            showNotification(context, habitName)
+        }
+
+        // 3. We still save to Firestore so the user can see it in their History
+        // even if the phone didn't "ping" them.
         val pendingResult = goAsync()
         saveNotificationToFirestore(habitName) {
             pendingResult.finish()
         }
-        // Alarms should be managed by your HabitViewModel to ensure the time stays consistent
-        // with what the user actually selected in the Dialog.
     }
 
     private fun showNotification(context: Context, habitName: String) {

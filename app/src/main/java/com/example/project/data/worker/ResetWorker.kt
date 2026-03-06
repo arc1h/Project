@@ -21,6 +21,16 @@ class ResetWorker(val context: Context, params: WorkerParameters) : CoroutineWor
         val db = Firebase.firestore
         val uid = Firebase.auth.currentUser?.uid ?: return Result.success()
 
+        // 1. Define "Today" at the start so all logic uses the same reference
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val startOfToday = calendar.timeInMillis
+        val now = System.currentTimeMillis()
+
         try {
             val habitsRef = db.collection("users").document(uid).collection("habits")
             val snapshot = habitsRef.get().await()
@@ -30,12 +40,28 @@ class ResetWorker(val context: Context, params: WorkerParameters) : CoroutineWor
             db.runBatch { batch ->
                 for (doc in snapshot.documents) {
                     val habit = doc.toHabit() ?: continue
+                    val type = habit.frequency.getTypeName()
 
-                    if (isHabitOverdue(habit)) {
+                    // Logic: Should the checkbox clear so they can do it again?
+                    val isNewWindow = if (type == "daily") {
+                        // Uncheck if the last time they did it was BEFORE 12:00 AM today
+                        habit.lastCompleted?.let { it < startOfToday } ?: true
+                    } else {
+                        // For non-daily, check if a full frequency cycle has passed
+                        habit.lastCompleted?.let { (now - it) > habit.frequency.toMillis() } ?: true
+                    }
+
+                    if (isNewWindow && habit.isCompleted) {
+                        batch.update(doc.reference, "completed", false)
+                    }
+
+                    // Logic: Is the streak actually DEAD? (Pass startOfToday as a parameter)
+                    if (isHabitOverdue(habit, startOfToday)) {
                         missedCount++
                         batch.update(doc.reference, mapOf(
                             "streak" to 0,
-                            "skippedCount" to habit.skippedCount + 1
+                            "skippedCount" to habit.skippedCount + 1,
+                            "completed" to false
                         ))
                     }
                 }
@@ -43,11 +69,7 @@ class ResetWorker(val context: Context, params: WorkerParameters) : CoroutineWor
 
             if (missedCount > 0) {
                 val message = if (missedCount == 1) "You missed a habit! Streak reset." else "You missed $missedCount habits! Streaks reset."
-
-                // 1. Phone Notification (System Tray)
                 sendResetNotification(message)
-
-                // 2. In-App Notification (Firestore History)
                 saveResetToFirestore(uid, message)
             }
 
@@ -58,11 +80,25 @@ class ResetWorker(val context: Context, params: WorkerParameters) : CoroutineWor
         }
     }
 
-    private fun isHabitOverdue(habit: Habit): Boolean {
+    private fun isHabitOverdue(habit: Habit, startOfToday: Long): Boolean {
         val lastTime = habit.lastCompleted ?: return false
         val now = System.currentTimeMillis()
-        val gracePeriod = 3600000L // 1 hour
-        return (now - lastTime) > (habit.frequency.toMillis() + gracePeriod)
+
+        return when (habit.frequency.getTypeName()) {
+            "daily" -> {
+                // Gone if last done BEFORE yesterday's 12:00 AM
+                val startOfYesterday = startOfToday - (24 * 60 * 60 * 1000L)
+                lastTime < startOfYesterday
+            }
+            "weekly" -> {
+                val oneWeekInMillis = 7 * 24 * 60 * 60 * 1000L
+                val gracePeriod = 24 * 60 * 60 * 1000L
+                (now - lastTime) > (oneWeekInMillis + gracePeriod)
+            }
+            else -> {
+                (now - lastTime) > (habit.frequency.toMillis() + 3600000L)
+            }
+        }
     }
 
     private fun sendResetNotification(message: String) {

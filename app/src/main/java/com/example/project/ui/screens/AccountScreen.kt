@@ -1,6 +1,6 @@
 package com.example.project.ui.screens
 
-import android.R.attr.onClick
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +23,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +40,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,13 +48,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.project.data.viewmodel.HabitViewModel
 import com.example.project.data.viewmodel.UserViewModel
-import com.example.project.navigation.Screen
 import com.example.project.ui.theme.LightGray
 import com.example.project.ui.theme.Purple
 import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 
 @Composable
@@ -79,12 +78,22 @@ fun AccountScreen(
         if (currentUser != null) {
             userViewModel.listenToNotifications()
 
-            // Fetch and format the joined date
+            // 1. Get the real metadata from Auth
             val timestamp = currentUser.metadata?.creationTimestamp
-            if (timestamp != null) {
+
+            if (timestamp != null && timestamp > 0) {
+                // 2. Format for current UI
                 val date = java.util.Date(timestamp)
                 val formatter = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault())
-                joinedDate = formatter.format(date) // Updates the state, making the UI appear
+                joinedDate = formatter.format(date)
+
+                // 3. Force-write the real timestamp to Firestore
+                // We use set with merge so it creates the field if it doesn't exist
+                Firebase.firestore.collection("users").document(currentUser.uid)
+                    .set(mapOf("createdAt" to timestamp), com.google.firebase.firestore.SetOptions.merge())
+                    .addOnSuccessListener {
+                        Log.d("FIX", "Successfully synced real date: $timestamp")
+                    }
             }
         }
     }
@@ -199,9 +208,9 @@ fun AccountScreen(
                     Spacer(modifier = Modifier.height(64.dp))
                     Text(
                         text = "Joined in $joinedDate",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 14.sp,
+                        color = Color.Gray
                     )
                 }
             }
@@ -234,21 +243,19 @@ fun AccountScreen(
             text = { Text("Are you sure you want to log out?") },
             confirmButton = {
                 Button(
-                    onClick = { showLogoutDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp), // Height adjusted to be sleeker
-                    shape = RoundedCornerShape(8.dp), // Matches the "Done" button in HabitCard
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Purple
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp) // Keeps it flat
+                    onClick = {
+                        Firebase.auth.signOut() // 1. Sign out from Firebase
+                        showLogoutDialog = false // 2. Close dialog
+                        // 3. Navigate back to Login (and clear backstack)
+                        navController?.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Purple)
                 ) {
-                    Text(
-                        text = "Log out",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White
-                    )
+                    Text("Log out", color = Color.White)
                 }
             },
             dismissButton = {

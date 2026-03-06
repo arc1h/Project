@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.example.project.data.model.Frequency
 import com.example.project.data.model.Habit
 import com.example.project.data.model.HabitDifficulty
@@ -17,8 +16,6 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.firestore
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 class HabitViewModel : ViewModel() {
 
@@ -61,49 +58,55 @@ class HabitViewModel : ViewModel() {
 
     fun markHabitAsDone(habit: Habit) {
         val uid = auth.currentUser?.uid ?: return
-        val userRef = firestore.collection("users").document(uid)
+        val db = Firebase.firestore
+
+        // 1. Calculate Rewards based on difficulty
+        val xpGained = when(habit.difficulty) {
+            HabitDifficulty.EASY -> 50L
+            HabitDifficulty.MODERATE -> 100L
+            HabitDifficulty.HARD -> 200L
+        }
+        val coinsGained = xpGained / 10
+        val newStreakValue = habit.streak + 1
+
+        val userRef = db.collection("users").document(uid)
         val habitRef = userRef.collection("habits").document(habit.id)
-        val historyRef = userRef.collection("habitHistory").document() // New history doc
+        val historyRef = userRef.collection("habitHistory").document()
 
-        firestore.runTransaction { transaction ->
-            val habitSnap = transaction.get(habitRef)
-            val userSnap = transaction.get(userRef)
-
-            // Calculate inside the transaction
-            val currentStreak = habitSnap.getLong("streak")?.toInt() ?: 0
-            val newStreakValue = currentStreak + 1
-
-            // 1. Update Habit
-            transaction.update(habitRef, mapOf(
-                "streak" to newStreakValue,
+        db.runBatch { batch ->
+            // 2. Update the Habit
+            batch.update(habitRef, mapOf(
+                "completed" to true,
                 "lastCompleted" to System.currentTimeMillis(),
-                "completed" to true // Add this so the UI knows it's checked
+                "streak" to newStreakValue
             ))
 
-            // 2. Update User (XP and Best Streak)
-            val currentXp = userSnap.getLong("xp") ?: 0L
-            val globalBest = userSnap.getLong("longestStreak")?.toInt() ?: 0
+            // 3. Update User Stats (Atomic increment)
+            batch.update(userRef, mapOf(
+                "xp" to FieldValue.increment(xpGained),
+                "coins" to FieldValue.increment(coinsGained)
+            ))
 
-            val userUpdates = mutableMapOf<String, Any>("xp" to currentXp + habit.difficulty.xp)
-            if (newStreakValue > globalBest) {
-                userUpdates["longestStreak"] = newStreakValue
-            }
-            transaction.update(userRef, userUpdates)
-
-            // 3. Log History
-            transaction.set(historyRef, mapOf(
-                "habitId" to habit.id,
+            // 4. Create the History Log
+            batch.set(historyRef, hashMapOf(
                 "habitName" to habit.name,
-                "timestamp" to System.currentTimeMillis(),
-                "streakAtTime" to newStreakValue
+                "timestamp" to com.google.firebase.Timestamp.now(), // Firestore timestamp
+                "xpGained" to xpGained.toInt(),
+                "coinsGained" to coinsGained.toInt(),
+                "difficulty" to habit.difficulty.toDisplayString(),
+                "streakAtTime" to newStreakValue,
+                "habitId" to habit.id
             ))
-
-            // Return the new streak so it's available in the Success listener
-            newStreakValue
-        }.addOnSuccessListener { finalStreak ->
-            Log.d("STREAK_DEBUG", "Success! Streak is now: $finalStreak")
+        }.addOnSuccessListener {
+            // 5. Update Global Best Streak if this habit just beat it
+            userRef.get().addOnSuccessListener { snapshot ->
+                val globalBest = snapshot.getLong("longestStreak") ?: 0L
+                if (newStreakValue > globalBest) {
+                    userRef.update("longestStreak", newStreakValue)
+                }
+            }
         }.addOnFailureListener { e ->
-            Log.e("STREAK_DEBUG", "Transaction failed: ${e.message}")
+            Log.e(TAG, "Failed to mark habit as done: ${e.message}")
         }
     }
 
@@ -178,45 +181,7 @@ class HabitViewModel : ViewModel() {
             }
     }
 
-    fun toggleHabit(habit: Habit) {
-        val uid = auth.currentUser?.uid ?: return
-        val db = Firebase.firestore
 
-        // ... existing logic to calculate XP based on difficulty ...
-        val xpGained = when(habit.difficulty) {
-            HabitDifficulty.EASY -> 50
-            HabitDifficulty.MODERATE -> 100
-            HabitDifficulty.HARD -> 200
-        }
-        val coinsGained = xpGained / 10
-
-        // 1. Update the Habit itself
-        val habitRef = db.collection("users").document(uid)
-            .collection("habits").document(habit.id)
-
-        // 2. CREATE THE LOG ENTRY
-        val logRef = db.collection("users").document(uid)
-            .collection("logs").document() // Auto-generate ID
-
-        val logData = hashMapOf(
-            "habitName" to habit.name,
-            "timestamp" to com.google.firebase.Timestamp.now(), // Crucial for ordering
-            "xpGained" to xpGained,
-            "coinsGained" to coinsGained,
-            "difficulty" to habit.difficulty.name.lowercase().replaceFirstChar { it.uppercase() }
-        )
-
-        db.runBatch { batch ->
-            // Update habit completion status
-            batch.update(habitRef, "completed", true)
-            batch.update(habitRef, "lastCompleted", System.currentTimeMillis())
-
-            // Save the log
-            batch.set(logRef, logData)
-        }.addOnSuccessListener {
-            Log.d("HabitVM", "Habit logged successfully!")
-        }
-    }
 
     fun skipHabit(habit: Habit) {
         val uid = auth.currentUser?.uid ?: return
