@@ -265,6 +265,8 @@ class HeroViewModel : ViewModel() {
                         "habit_completed" -> challenge.title.contains("Consistency", ignoreCase = true)
                         "morning_habit" -> challenge.title.contains("Bird", ignoreCase = true)
                         "hard_habit" -> challenge.title.contains("Hard", ignoreCase = true)
+                        "weekend" -> challenge.title.contains("Weekend", ignoreCase = true)
+                        "night_owl" -> challenge.title.contains("Night", ignoreCase = true)
                         "streak" -> challenge.title.contains("Streak", ignoreCase = true)
                         else -> false
                     }

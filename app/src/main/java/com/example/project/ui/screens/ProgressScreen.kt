@@ -86,11 +86,11 @@ import java.io.File
 
 data class ProgressStats(
     val longestStreakHabit: String = "No data",
-    val longestStreakDays: Int = 0,
+    val longestStreakDays: Int? = null,
     val shortestStreakHabit: String = "No data",
-    val shortestStreakDays: Int = 0,
+    val shortestStreakDays: Int? = null,
     val mostSkippedHabit: String = "No data",
-    val mostSkippedDays: Int = 0
+    val mostSkippedDays: Int? = null
 )
 
 @Composable
@@ -121,23 +121,23 @@ fun ProgressScreen(
 
             // Use the real-time streak from the hero listener
             val currentGlobalRecord = hero?.longestStreak ?: 0
+            val resolvedLongestStreak = maxOf(currentGlobalRecord, bestHabit?.streak ?: 0)
 
             val startedHabits = habits.filter { it.streak > 0 }
-            val worstHabit = startedHabits.minByOrNull { it.streak } ?: habits.firstOrNull()
+            val worstHabit = startedHabits.minByOrNull { it.streak }
 
-            val skippedHabit = habits.filter { it.skippedCount > 0 }
-                .maxByOrNull { it.skippedCount }
+            val skippedHabit = habits.filter { it.skippedCount > 0 }.maxByOrNull { it.skippedCount }
 
             ProgressStats(
                 // Logic: Use whichever is higher—the current habit's streak or the saved record
-                longestStreakHabit = bestHabit?.name ?: "No Habit",
-                longestStreakDays = maxOf(currentGlobalRecord, bestHabit?.streak ?: 0),
+                longestStreakHabit = bestHabit?.name ?: "No data",
+                longestStreakDays = if (resolvedLongestStreak > 0) resolvedLongestStreak else null,
 
-                shortestStreakHabit = worstHabit?.name ?: "No Habit",
-                shortestStreakDays = worstHabit?.streak ?: 0,
+                shortestStreakHabit = worstHabit?.name ?: "No data",
+                shortestStreakDays = worstHabit?.streak,
 
-                mostSkippedHabit = skippedHabit?.name ?: "None",
-                mostSkippedDays = skippedHabit?.skippedCount ?: 0
+                mostSkippedHabit = skippedHabit?.name ?: "No data",
+                mostSkippedDays = skippedHabit?.skippedCount
             )
         }
     }
@@ -221,18 +221,18 @@ fun ProgressScreen(
                     val longestHabitObj = habits.find { it.name == stats.longestStreakHabit }
                     StatCard(
                         title = "Longest Streak",
-                        value = "${stats.longestStreakDays}",
+                        value = stats.longestStreakDays?.toString() ?: "-",
                         habitName = stats.longestStreakHabit,
-                        frequency = longestHabitObj?.frequency?.getTypeName() ?: "daily", // Fix: pass lowercase type
+                        frequency = if (stats.longestStreakDays != null) (longestHabitObj?.frequency?.getTypeName() ?: "daily") else "",
                         modifier = Modifier.weight(1f)
                     )
 
                     val shortestHabitObj = habits.find { it.name == stats.shortestStreakHabit }
                     StatCard(
                         title = "Shortest Streak",
-                        value = "${stats.shortestStreakDays}",
+                        value = stats.shortestStreakDays?.toString() ?: "-",
                         habitName = stats.shortestStreakHabit,
-                        frequency = shortestHabitObj?.frequency?.getTypeName() ?: "daily",
+                        frequency = if (stats.shortestStreakDays != null) (shortestHabitObj?.frequency?.getTypeName() ?: "daily") else "",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -243,9 +243,9 @@ fun ProgressScreen(
                 val skippedFreq = habits.find { it.name == stats.mostSkippedHabit }?.frequency?.getTypeName() ?: ""
                 StatCard(
                     title = "Most Skipped",
-                    value = "${stats.mostSkippedDays}",
+                    value = stats.mostSkippedDays?.toString() ?: "-",
                     habitName = stats.mostSkippedHabit,
-                    frequency = skippedFreq,
+                    frequency = if (stats.mostSkippedDays != null) skippedFreq else "",
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(24.dp))

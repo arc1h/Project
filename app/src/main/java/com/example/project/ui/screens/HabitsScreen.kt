@@ -198,7 +198,6 @@ fun HabitsScreen(
                     items(habits, key = { it.id }) { habit ->
                         HabitCard(
                             habit = habit,
-                            // Inside HabitsScreen.kt -> onChecked block
                             onChecked = {
                                 habitViewModel.markHabitAsDone(habit)
 
@@ -206,7 +205,8 @@ fun HabitsScreen(
                                 heroViewModel.incrementChallengeProgress("habit_completed")
 
                                 // 2. Early Bird Check (Before 11 AM)
-                                val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                                val calendar = Calendar.getInstance()
+                                val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
                                 if (currentHour < 11) {
                                     heroViewModel.incrementChallengeProgress("morning_habit")
                                 }
@@ -215,6 +215,24 @@ fun HabitsScreen(
                                 // If the habit you just checked is 'HARD', send the specific signal
                                 if (habit.difficulty == HabitDifficulty.HARD) {
                                     heroViewModel.incrementChallengeProgress("hard_habit")
+                                }
+
+                                // 4. Weekend Warrior Check (Sunday)
+                                if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
+                                    heroViewModel.incrementChallengeProgress("weekend")
+                                }
+
+                                // 5. Night Owl Check (After 8 PM/20:00)
+                                if (currentHour >= 20) {
+                                    heroViewModel.incrementChallengeProgress("night_owl")
+                                }
+
+                                // 6. Habit Streak Check
+                                // Increment progress if the *new* streak contributes up to the goal of 3.
+                                // If they do streak 1 -> streak 2 -> streak 3, it increments 3 times (completing challenge).
+                                // Future completions (streak 4+) won't erroneously increment it again.
+                                if (habit.streak + 1 <= 3) {
+                                    heroViewModel.incrementChallengeProgress("streak")
                                 }
                             },
                             onEdit = { editingHabit = habit },
