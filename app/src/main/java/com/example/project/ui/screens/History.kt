@@ -79,7 +79,7 @@ fun History(navController: NavController) {
             onDispose { }
         } else {
             val historyRegistration = firestore.collection("users").document(currentUserId)
-                .collection("logs")
+                .collection("habitHistory")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
@@ -90,16 +90,27 @@ fun History(navController: NavController) {
 
                     if (snapshot != null) {
                         Log.d("HistoryScreen", "Loaded ${snapshot.size()} logs from Firestore.")
-                        habitLogs = snapshot.documents.map { doc ->
-                            HabitLog(
-                                id = doc.id,
-                                habitName = doc.getString("habitName") ?: "Unknown",
-                                timestamp = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
-                                    .format(doc.getTimestamp("timestamp")?.toDate() ?: Date()),
-                                xpGained = doc.getLong("xpGained")?.toInt() ?: 0,
-                                coinsGained = doc.getLong("coinsGained")?.toInt() ?: 0,
-                                difficulty = doc.getString("difficulty") ?: "Easy"
-                            )
+                        habitLogs = snapshot.documents.mapNotNull { doc ->
+                            try {
+                                val timestampObj = doc.get("timestamp")
+                                val date = when (timestampObj) {
+                                    is com.google.firebase.Timestamp -> timestampObj.toDate()
+                                    is Long -> java.util.Date(timestampObj)
+                                    else -> java.util.Date()
+                                }
+
+                                HabitLog(
+                                    id = doc.id,
+                                    habitName = doc.getString("habitName") ?: "Unknown",
+                                    timestamp = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(date),
+                                    xpGained = doc.getLong("xpGained")?.toInt() ?: 0,
+                                    coinsGained = doc.getLong("coinsGained")?.toInt() ?: 0,
+                                    difficulty = doc.getString("difficulty") ?: "Easy"
+                                )
+                            } catch (e: Exception) {
+                                Log.e("HistoryScreen", "Error parsing doc \${doc.id}", e)
+                                null
+                            }
                         }
                     }
                     isLoading = false
@@ -255,7 +266,7 @@ fun HistoryEmptyState() {
 fun clearAllLogs(uid: String?) {
     if (uid == null) return
     val db = Firebase.firestore
-    db.collection("users").document(uid).collection("logs").get()
+    db.collection("users").document(uid).collection("habitHistory").get()
         .addOnSuccessListener { snapshot ->
             val batch = db.batch()
             snapshot.documents.forEach { batch.delete(it.reference) }
