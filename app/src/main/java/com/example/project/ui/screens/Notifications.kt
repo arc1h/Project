@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,8 +37,7 @@ import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
-// --- Data Models ---
-
+// Data Models
 data class FriendRequest(
     val requesterId: String,
     val requesterUsername: String
@@ -51,8 +49,7 @@ data class InAppNotification(
     val type: String // "REMINDER" or "FRIEND_REQUEST"
 )
 
-// --- Main Screen ---
-
+// Main Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Notifications(navController: NavController? = null, userViewModel: UserViewModel) {
@@ -90,7 +87,6 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
         } else {
             // Logic: Clear the badge visual when the user enters the screen
             userViewModel.clearBadge()
-
             val historyRegistration = firestore.collection("users").document(currentUserId)
                 .collection("notifications")
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
@@ -132,7 +128,6 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                         }
                     }
                 }
-
             onDispose {
                 historyRegistration.remove()
                 userDocReg.remove()
@@ -172,11 +167,7 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                 .padding(padding)
                 .padding(horizontal = 24.dp)
         ) {
-            // REMOVE the old "Notifications" Text() and Spacer() from here
-            // because they are now in the TopAppBar
-
-            Spacer(modifier = Modifier.height(8.dp)) // Small breathing room after TopAppBar
-
+            Spacer(modifier = Modifier.height(8.dp))
             // Daily Reminder Settings Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -230,10 +221,9 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                             onAccept = {
                                 scope.launch {
                                     currentUserId?.let { uid ->
-                                        // Call your utility function
+                                        // Calls utility function
                                         acceptFriendRequest(uid, request.requesterId)
-                                        // The SnapshotListener in Notifications.kt will
-                                        // automatically refresh the list for us!
+                                        // SnapshotListener in Notifications.kt automatically refreshes list
                                         Toast.makeText(context, "Friend request accepted!", Toast.LENGTH_SHORT).show()
                                     }
                                 }
@@ -241,7 +231,6 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                             onDecline = {
                                 scope.launch {
                                     currentUserId?.let { uid ->
-                                        // Use the correct semantic function
                                         declineFriendRequest(uid, request.requesterId)
                                         Toast.makeText(context, "Request declined", Toast.LENGTH_SHORT).show()
                                     }
@@ -249,13 +238,11 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
                             }
                         )
                     }
-
                     // 2. Habit History Notifications Section
                     items(inAppNotifications) { notification ->
                         NotificationHistoryCard(notification)
                     }
                 }
-
                 if (inAppNotifications.isNotEmpty()) {
                     TextButton(
                         onClick = { clearAllNotifications(currentUserId) },
@@ -274,21 +261,14 @@ fun Notifications(navController: NavController? = null, userViewModel: UserViewM
     }
 }
 
-// --- Supporting UI Components ---
-
+// Supporting UI
 @Composable
 fun NotificationHistoryCard(notification: InAppNotification) {
-    val isNudge = notification.type == "NUDGE"
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isNudge)
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-            else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
-        border = if (isNudge) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary) else null,
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
@@ -296,9 +276,9 @@ fun NotificationHistoryCard(notification: InAppNotification) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (isNudge) Icons.Default.Favorite else Icons.Default.Notifications,
+                imageVector = Icons.Default.Notifications,
                 contentDescription = null,
-                tint = if (isNudge) MaterialTheme.colorScheme.secondary else Color.Gray,
+                tint = Color.Gray,
                 modifier = Modifier.size(24.dp).padding(end = 12.dp)
             )
             Column {
@@ -372,7 +352,6 @@ fun EmptyStateView() {
 fun clearAllNotifications(uid: String?) {
     if (uid == null) return
     val db = Firebase.firestore
-
     // Batch delete is better for performance
     db.collection("users").document(uid).collection("notifications")
         .get()

@@ -52,10 +52,8 @@ import com.example.project.ui.theme.LightGray
 import com.example.project.ui.theme.Purple
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
-import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 
 @Composable
@@ -88,7 +86,6 @@ fun AccountScreen(
                 joinedDate = formatter.format(date)
 
                 // 3. Force-write the real timestamp to Firestore
-                // We use set with merge so it creates the field if it doesn't exist
                 Firebase.firestore.collection("users").document(currentUser.uid)
                     .set(mapOf("createdAt" to timestamp), com.google.firebase.firestore.SetOptions.merge())
                     .addOnSuccessListener {
@@ -109,12 +106,10 @@ fun AccountScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Section
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Title
                 Text(
                     text = "Your Account",
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
@@ -159,7 +154,6 @@ fun AccountScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Menu Options
                 AccountMenuItem(
                     text = "Notifications",
                     onClick = {
@@ -176,7 +170,6 @@ fun AccountScreen(
                         navController?.navigate("history")
                     }
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
 
                 AccountMenuItem(
@@ -185,7 +178,6 @@ fun AccountScreen(
                         navController?.navigate("account_details")
                     }
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
 
                 AccountMenuItem(
@@ -194,7 +186,6 @@ fun AccountScreen(
                         navController?.navigate("app_settings")
                     }
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
 
                 AccountMenuItem(
@@ -215,7 +206,7 @@ fun AccountScreen(
                 }
             }
 
-            // Bottom Section - Logout Button
+            // Logout Button
             Button(
                 onClick = { showLogoutDialog = true },
                 modifier = Modifier
@@ -295,12 +286,12 @@ fun AccountMenuItem(
             .fillMaxWidth()
             .height(60.dp)
             .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp), // Matches HabitCard
-        border = BorderStroke(1.dp, LightGray), // Matches HabitCard border
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, LightGray),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Flat design
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -318,7 +309,7 @@ fun AccountMenuItem(
             if (badge != null && badge > 0) {
                 Surface(
                     color = Purple,
-                    shape = RoundedCornerShape(8.dp), // Sharper badge to match buttons
+                    shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.height(24.dp).widthIn(min = 24.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 8.dp)) {

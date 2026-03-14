@@ -31,8 +31,7 @@ fun AppSettings(
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("prefs", Context.MODE_PRIVATE) }
-
-    // READ PREFERENCES
+    // Preferences
     var notificationsEnabled by remember {
         mutableStateOf(prefs.getBoolean("notifications_enabled", true))
     }
@@ -111,7 +110,7 @@ fun AppSettings(
                                 confirmDelete = true
                                 Toast.makeText(context, "Preferences Reset", Toast.LENGTH_SHORT).show()
                             },
-                            contentPadding = PaddingValues(0.dp) // Aligns text to left
+                            contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
                                 text = "Reset Preferences",

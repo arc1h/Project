@@ -96,7 +96,7 @@ data class ProgressStats(
 @Composable
 fun ProgressScreen(
     habitViewModel: HabitViewModel = viewModel(),
-    heroViewModel: HeroViewModel = viewModel() // Added HeroViewModel
+    heroViewModel: HeroViewModel = viewModel()
 ) {
     val currentUser = Firebase.auth.currentUser
     val habits = habitViewModel.habits
@@ -114,8 +114,8 @@ fun ProgressScreen(
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
     var isUploading by remember { mutableStateOf(false) }
 
-    // --- REACTIVE STATS CALCULATION ---
-    val stats by remember(habits, hero) { // Remove globalLongestRecord, use hero
+    // Reactive stats calculation
+    val stats by remember(habits, hero) {
         derivedStateOf {
             val bestHabit = habits.maxByOrNull { it.streak }
 
@@ -142,7 +142,7 @@ fun ProgressScreen(
         }
     }
 
-    // --- LOAD DATA ON STARTUP ---
+    // Load data on start-up
     LaunchedEffect(currentUser?.uid) {
         currentUser?.uid?.let { uid ->
             try {
@@ -157,7 +157,7 @@ fun ProgressScreen(
         }
     }
 
-    // --- SAVE NOTES WITH DEBOUNCE ---
+    // Save notes with debounce
     LaunchedEffect(notes) {
         delay(1000)
         currentUser?.uid?.let { uid ->
@@ -251,10 +251,9 @@ fun ProgressScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // --- FIXED TABROW ---
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.background, // Match background to prevent blending
+                containerColor = MaterialTheme.colorScheme.background,
                 indicator = { tabPositions ->
                     if (selectedTab < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
@@ -289,7 +288,7 @@ fun ProgressScreen(
         }
     }
 
-    // Dialogs...
+    // Dialogs
     selectedImageUrl?.let { path ->
         ImageFullscreenDialog(
             imagePath = path,
@@ -364,7 +363,6 @@ fun PicturesTab(urls: List<String>, onImageClick: (String) -> Unit) {
                 border = BorderStroke(2.dp, LightGray),
             ) {
                 Image(
-                    // Wrap path in File() so Coil knows it's local
                     painter = rememberAsyncImagePainter(File(path)),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
@@ -397,7 +395,6 @@ fun ImageFullscreenDialog(
     onDismiss: () -> Unit,
     onDelete: (String) -> Unit
 ) {
-    // Local state to track if the confirmation dialog is open
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Dialog(
@@ -418,8 +415,7 @@ fun ImageFullscreenDialog(
                     .clickable { onDismiss() },
                 contentScale = ContentScale.Fit
             )
-
-            // TOP BUTTON BAR
+            // Top button bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -439,8 +435,6 @@ fun ImageFullscreenDialog(
                     )
                 }
             }
-
-            // ACTUAL CONFIRMATION DIALOG
             if (showDeleteConfirm) {
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirm = false },

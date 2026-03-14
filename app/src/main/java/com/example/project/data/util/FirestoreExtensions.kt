@@ -13,7 +13,6 @@ fun DocumentSnapshot.toHabit(): Habit? {
             name = getString("name") ?: "",
             frequency = Frequency.fromStorageString(getString("frequency") ?: "DAILY|1|NONE"),
             lastCompleted = getLong("lastCompleted"),
-            // ADD THIS: Maps the Firestore field "completed" to our Kotlin "isCompleted"
             isCompleted = getBoolean("completed") ?: false,
             difficulty = HabitDifficulty.valueOf(getString("difficulty") ?: "EASY"),
             streak = getLong("streak")?.toInt() ?: 0,
@@ -30,7 +29,7 @@ fun Habit.toFirestoreMap(): Map<String, Any?> {
         "name" to name,
         "frequency" to frequency.toStorageString(),
         "lastCompleted" to lastCompleted,
-        "completed" to isCompleted, // ADD THIS
+        "completed" to isCompleted,
         "difficulty" to difficulty.name,
         "streak" to streak,
         "skippedCount" to skippedCount,

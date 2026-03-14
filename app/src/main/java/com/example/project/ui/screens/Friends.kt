@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -65,7 +63,7 @@ fun FriendHero(navController: NavController, friendUid: String) {
                 val formatter = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault())
                 joinedDate = formatter.format(date)
             } else {
-                // FALLBACK: If the field is missing, show this instead
+                // Fallback: If the field is missing, show this instead
                 joinedDate = "ERROR"
             }
         } catch (e: Exception) {
@@ -101,7 +99,6 @@ fun FriendHero(navController: NavController, friendUid: String) {
                 }
             } else if (friendHero != null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Your existing PixelatedCard here...
                     PixelatedCard(
                         borderColor = MaterialTheme.colorScheme.background,
                         backgroundColor = MaterialTheme.colorScheme.background
@@ -120,7 +117,6 @@ fun FriendHero(navController: NavController, friendUid: String) {
                                     .border(3.dp, Color.LightGray),
                                 contentAlignment = Alignment.Center
                             ) {
-                                // This padding ensures the hero sprite never touches the border
                                 Box(
                                     modifier = Modifier
                                         .size(150.dp)

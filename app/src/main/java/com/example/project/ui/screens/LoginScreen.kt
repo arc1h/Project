@@ -152,7 +152,7 @@ fun LoginScreen(
                 }
 
         } else {
-            // REGISTER: First check if username is already taken in Firestore
+            // Register: First check if username is already taken in Firestore
             db.collection("users").whereEqualTo("username", username).get()
                 .addOnSuccessListener { usernameResult ->
                     if (!usernameResult.isEmpty) {
@@ -164,7 +164,6 @@ fun LoginScreen(
                             .addOnCompleteListener { task ->
                                 if (task.isSuccessful) {
                                     val userId = task.result?.user?.uid ?: return@addOnCompleteListener
-                                    
                                     // Initialize user and WAIT for completion before navigating
                                     initializeNewUser(userId, username, email) { success ->
                                         loading = false

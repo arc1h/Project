@@ -60,7 +60,6 @@ class HabitViewModel : ViewModel() {
         val uid = auth.currentUser?.uid ?: return
         val db = Firebase.firestore
 
-        // 1. Calculate Rewards based on difficulty
         val xpGained = when(habit.difficulty) {
             HabitDifficulty.EASY -> 50L
             HabitDifficulty.MODERATE -> 100L
@@ -74,20 +73,17 @@ class HabitViewModel : ViewModel() {
         val historyRef = userRef.collection("habitHistory").document()
 
         db.runBatch { batch ->
-            // 2. Update the Habit
             batch.update(habitRef, mapOf(
                 "completed" to true,
                 "lastCompleted" to System.currentTimeMillis(),
                 "streak" to newStreakValue
             ))
 
-            // 3. Update User Stats (Atomic increment)
             batch.update(userRef, mapOf(
                 "xp" to FieldValue.increment(xpGained),
                 "coins" to FieldValue.increment(coinsGained)
             ))
 
-            // 4. Create the History Log
             batch.set(historyRef, hashMapOf(
                 "habitName" to habit.name,
                 "timestamp" to com.google.firebase.Timestamp.now(), // Firestore timestamp
@@ -98,7 +94,6 @@ class HabitViewModel : ViewModel() {
                 "habitId" to habit.id
             ))
         }.addOnSuccessListener {
-            // 5. Update Global Best Streak if this habit just beat it
             userRef.get().addOnSuccessListener { snapshot ->
                 val globalBest = snapshot.getLong("longestStreak") ?: 0L
                 if (newStreakValue > globalBest) {

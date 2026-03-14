@@ -131,9 +131,9 @@ fun HeroScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(150.dp)
-                                        .padding(4.dp) // Add a little margin so it doesn't touch the Card's border
+                                        .padding(4.dp)
                                         .clip(RoundedCornerShape(3.dp))
-                                        .background(MaterialTheme.colorScheme.surface), // Use surface color to distinguish
+                                        .background(MaterialTheme.colorScheme.surface),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     AnimatedHero(charId = hero.char)
@@ -259,10 +259,10 @@ fun PixelatedCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(4.dp)) // Clip EVERYTHING to the shape first
+            .clip(RoundedCornerShape(4.dp))
             .background(backgroundColor)
             .border(2.dp, borderColor, RoundedCornerShape(4.dp))
-            .padding(2.dp) // Content starts inside the border
+            .padding(2.dp)
     ) {
         content()
     }
@@ -270,7 +270,6 @@ fun PixelatedCard(
 
 @Composable
 fun AnimatedHero(charId: String?) {
-    // Force "0" if the database has anything else for now to test
     val safeId = if (charId.isNullOrBlank() || charId == "default") "0" else charId
 
     var isFrameTwo by remember { mutableStateOf(false) }
@@ -358,7 +357,6 @@ fun ChallengeCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                // THE DESCRIPTION
                 Text(
                     text = challenge.description,
                     fontFamily = PixelFont,
@@ -369,7 +367,7 @@ fun ChallengeCard(
                 )
             }
 
-            // Progress Bar Section
+            // Progress Bar
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val displayProgress = if (challenge.isCompleted) challenge.goal else challenge.progress
                 Text(
@@ -383,9 +381,9 @@ fun ChallengeCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(24.dp) // Slightly taller
+                        .height(24.dp)
                         .border(2.dp, borderColor)
-                        .background(Color.Black.copy(alpha = 0.2f)) // Darker track for better contrast
+                        .background(Color.Black.copy(alpha = 0.2f))
                 ) {
                     val ratio = if (challenge.isCompleted) 1f else if (challenge.goal > 0)
                         (challenge.progress.toFloat() / challenge.goal.toFloat()).coerceIn(0f, 1f)
@@ -516,7 +514,6 @@ fun FriendPickerDialog(
     val uid = Firebase.auth.currentUser?.uid
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-
     // Change to SnapshotListener for real-time sync
     androidx.compose.runtime.DisposableEffect(uid) {
         if (uid == null) {
@@ -528,7 +525,6 @@ fun FriendPickerDialog(
         val listener = firestore.collection("users").document(uid)
             .addSnapshotListener { snapshot, _ ->
                 val friendIds = snapshot?.get("friends") as? List<String> ?: emptyList()
-
                 // When the friend list changes, fetch their profile info
                 kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                     val updatedList = friendIds.map { friendId ->
@@ -568,7 +564,6 @@ fun FriendPickerDialog(
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(friends) { friend ->
-                        // Using a Surface for a nice clickable row effect
                         Surface(
                             onClick = { onFriendSelected(friend.uid) },
                             shape = RoundedCornerShape(12.dp),
@@ -588,10 +583,8 @@ fun FriendPickerDialog(
                                 Image(
                                     painter = painterResource(id = if (resId != 0) resId else R.drawable.hero00),
                                     contentDescription = null,
-                                    modifier = Modifier.size(48.dp) // Slightly larger since the circle is gone
+                                    modifier = Modifier.size(48.dp)
                                 )
-
-                                // 2. Username (Aligned Right)
                                 Text(
                                     text = friend.username,
                                     modifier = Modifier

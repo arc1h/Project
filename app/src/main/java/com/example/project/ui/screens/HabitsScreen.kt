@@ -211,8 +211,7 @@ fun HabitsScreen(
                                     heroViewModel.incrementChallengeProgress("morning_habit")
                                 }
 
-                                // 3. ADD THIS: Hard Mode Check
-                                // If the habit you just checked is 'HARD', send the specific signal
+                                // 3. Hard Mode Check
                                 if (habit.difficulty == HabitDifficulty.HARD) {
                                     heroViewModel.incrementChallengeProgress("hard_habit")
                                 }
@@ -332,7 +331,6 @@ fun HabitDialog(
                 }
 
                 Spacer(Modifier.height(16.dp))
-
                 Text("Difficulty", style = MaterialTheme.typography.bodyMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -357,8 +355,6 @@ fun HabitDialog(
                         selectedDays = if (selectedDays.contains(day)) selectedDays - day else selectedDays + day
                     })
                 }
-
-                // REMINDER ROW (Now correctly inside the 'text' Column)
                 Spacer(Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -386,7 +382,6 @@ fun HabitDialog(
                             interval,
                             daysOfWeek = if (selectedDays.isEmpty()) null else selectedDays
                         )
-                        // Pass selectedDifficulty here!
                         onSave(name, frequency, selectedDifficulty, reminderTime)
                     } else {
                         nameError = true
@@ -403,7 +398,6 @@ fun DayPicker(
     selectedDays: Set<DayOfWeek>,
     onDaySelected: (DayOfWeek) -> Unit
 ) {
-    // Custom sort: Sunday first
     val sundayFirst = listOf(
         DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY,
         DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY

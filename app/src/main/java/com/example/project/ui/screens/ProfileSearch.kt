@@ -190,19 +190,14 @@ fun ProfileSearch(navController: NavController? = null) {
                                             }
                                             UserAction.UNSEND -> {
                                                 if (processingIds.contains(user.uid)) return@launch
-
-                                                // Start processing
                                                 processingIds = processingIds + user.uid
-                                                // Optimistic UI: Remove it immediately
                                                 val previousSentIds = sentIds
                                                 sentIds = sentIds - user.uid
 
                                                 try {
                                                     cancelFriendRequest(uid, user.uid)
-                                                    // If successful, we don't need to do anything,
-                                                    // the listener will eventually confirm this.
                                                 } catch (e: Exception) {
-                                                    // ROLLBACK: If it fails, put the ID back so the button flips back to 'Unsend'
+                                                    // Rollback: If it fails, put the ID back so the button flips back to 'Unsend'
                                                     sentIds = previousSentIds
                                                     Log.e("ProfileSearch", "Unsend failed", e)
                                                 } finally {
@@ -227,8 +222,7 @@ fun ProfileSearch(navController: NavController? = null) {
                 }
             }
         }
-
-        // Alert Dialog for Unfriend remains the same...
+        // Alert Dialog for Unfriend
         if (userToUnfriend != null) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { userToUnfriend = null },
@@ -273,7 +267,6 @@ fun UserProfileCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Username
             Text(
                 text = user.username,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),

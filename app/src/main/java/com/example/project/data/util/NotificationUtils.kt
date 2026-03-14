@@ -12,8 +12,6 @@ fun scheduleHabitAlarm(context: Context, habitName: String, hour: Int, minute: I
     val intent = Intent(context, NotificationWorker::class.java).apply {
         putExtra("HABIT_NAME", habitName)
     }
-
-    // FIX: Use habitName.hashCode() so it matches the cancel function
     val requestCode = habitName.hashCode()
 
     val pendingIntent = PendingIntent.getBroadcast(

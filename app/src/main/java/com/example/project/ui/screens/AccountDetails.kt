@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.project.data.viewmodel.UserViewModel
@@ -54,7 +52,6 @@ import com.example.project.ui.theme.Purple
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.pipeline.Expression.Companion.isError
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,11 +65,9 @@ fun AccountDetails(
     val currentUser = auth.currentUser
     val userId = currentUser?.uid ?: ""
     val scope = rememberCoroutineScope()
-
     // Data from ViewModel
     val username = userViewModel.username ?: "Loading..."
     val email = currentUser?.email ?: ""
-
     // Dialog & Feedback states
     var showEditUsernameDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
@@ -123,8 +118,7 @@ fun AccountDetails(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-
-                // Credentials Card
+                // Credentials
                 Text("Credentials", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -140,8 +134,7 @@ fun AccountDetails(
                     }
                 }
             }
-
-            // Bottom Section (Fixed at bottom)
+            // Bottom Section
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = {
@@ -175,7 +168,7 @@ fun AccountDetails(
         }
     }
 
-    // Logic for Dialogs (Remains similar but ensures feedbackMessage is updated)
+    // Logic for Dialogs
     if (showEditUsernameDialog) {
         EditUsernameDialog(
             currentUsername = username,
@@ -190,7 +183,7 @@ fun AccountDetails(
         )
     }
 
-    // Pass the actual Delete logic into the dialog
+    // Delete logic
     if (showDeleteAccountDialog) {
         DeleteAccountDialog(
             onDismiss = { showDeleteAccountDialog = false },
@@ -208,7 +201,7 @@ fun AccountDetails(
         )
     }
 
-    // Change Password Dialog Logic
+    // Password logic
     if (showChangePasswordDialog) {
         ChangePasswordDialog(
             onDismiss = { showChangePasswordDialog = false },
@@ -217,7 +210,6 @@ fun AccountDetails(
                 if (user?.email != null) {
                     // 1. Create credential for re-authentication
                     val credential = EmailAuthProvider.getCredential(user.email!!, currentPassword)
-
                     // 2. Re-authenticate (Required by Firebase for sensitive changes)
                     user.reauthenticate(credential)
                         .addOnSuccessListener {

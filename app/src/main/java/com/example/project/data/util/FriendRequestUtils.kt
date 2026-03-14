@@ -14,8 +14,6 @@ suspend fun sendFriendRequest(currentUserId: String, targetUserId: String) {
     val currentUserRef = firestore.collection("users").document(currentUserId)
     val targetUserRef = firestore.collection("users").document(targetUserId)
     val notificationRef = targetUserRef.collection("notifications").document()
-
-    // We hardcode "Someone" first to ensure the write succeeds even if the 'get' fails
     val notificationData = mapOf(
         "title" to "New friend request!",
         "timestamp" to System.currentTimeMillis(),
@@ -46,21 +44,19 @@ suspend fun acceptFriendRequest(currentUserId: String, requesterId: String) {
     val notifications = firestore.collection("users").document(currentUserId)
         .collection("notifications")
         .whereEqualTo("type", "FRIEND_REQUEST")
-        // Note: You might want to store requesterId in the notification
-        // data during sendFriendRequest to make finding it easier here
         .get().await()
 
     for (doc in notifications.documents) {
         batch.delete(doc.reference)
     }
 
-    // 1. Update the person who clicked ACCEPT (User 2)
+    // Update the person who clicked ACCEPT
     batch.update(currentUserRef,
         "receivedFriendRequests", com.google.firebase.firestore.FieldValue.arrayRemove(requesterId),
         "friends", com.google.firebase.firestore.FieldValue.arrayUnion(requesterId)
     )
 
-    // 2. Update the person who SENT the request (User 1)
+    // Update the person who SENT the request
     batch.update(requesterRef,
         "sentFriendRequests", com.google.firebase.firestore.FieldValue.arrayRemove(currentUserId),
         "friends", com.google.firebase.firestore.FieldValue.arrayUnion(currentUserId)
@@ -69,8 +65,6 @@ suspend fun acceptFriendRequest(currentUserId: String, requesterId: String) {
     try {
         batch.commit().await()
     } catch (e: Exception) {
-        // If 'update' fails because the fields don't exist yet, we use 'set' with Merge
-        // this is a safety net for older accounts
         val data1 = mapOf("friends" to com.google.firebase.firestore.FieldValue.arrayUnion(requesterId))
         val data2 = mapOf("friends" to com.google.firebase.firestore.FieldValue.arrayUnion(currentUserId))
 
@@ -91,8 +85,6 @@ suspend fun cancelFriendRequest(currentUserId: String, targetUserId: String) {
     batch.update(targetUserRef, "receivedFriendRequests", FieldValue.arrayRemove(currentUserId))
 
     // 2. Clear the notification without a query
-    // To do this, we should ideally use a predictable ID, but for now,
-    // let's just commit the IDs change.
     try {
         batch.commit().await()
     } catch (e: Exception) {

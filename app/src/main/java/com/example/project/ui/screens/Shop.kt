@@ -61,7 +61,6 @@ fun Shop(navController: NavController? = null) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Large pixelated lock or treasure chest image
                 Image(
                     painter = painterResource(id = R.drawable.pixel_star),
                     contentDescription = "Locked",
