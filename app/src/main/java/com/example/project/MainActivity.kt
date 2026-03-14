@@ -16,7 +16,6 @@ import androidx.work.WorkManager
 import com.example.project.data.worker.ResetWorker
 import java.util.concurrent.TimeUnit
 
-// Create a CompositionLocal for ThemeManager
 val LocalThemeManager = compositionLocalOf<ThemeManager> {
     error("No ThemeManager provided")
 }
@@ -29,7 +28,6 @@ class MainActivity : ComponentActivity() {
 
         themeManager = ThemeManager(applicationContext)
 
-        // --- SCHEDULE THE RESET WORKER ---
         scheduleHabitReset(applicationContext)
 
         setContent {
