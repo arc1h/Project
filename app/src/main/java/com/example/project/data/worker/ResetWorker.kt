@@ -61,7 +61,8 @@ class ResetWorker(val context: Context, params: WorkerParameters) : CoroutineWor
                         batch.update(doc.reference, mapOf(
                             "streak" to 0,
                             "skippedCount" to habit.skippedCount + 1,
-                            "completed" to false
+                            "completed" to false,
+                            "lastCompleted" to System.currentTimeMillis()
                         ))
                     }
                 }

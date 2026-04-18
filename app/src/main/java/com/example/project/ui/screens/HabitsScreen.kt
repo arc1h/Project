@@ -227,11 +227,9 @@ fun HabitsScreen(
                                 }
 
                                 // 6. Habit Streak Check
-                                // Increment progress if the *new* streak contributes up to the goal of 3.
-                                // If they do streak 1 -> streak 2 -> streak 3, it increments 3 times (completing challenge).
-                                // Future completions (streak 4+) won't erroneously increment it again.
-                                if (habit.streak + 1 <= 3) {
-                                    heroViewModel.incrementChallengeProgress("streak")
+                                // We update the challenge progress to match the absolute highest current streak.
+                                if (habit.streak + 1 > 0) {
+                                    heroViewModel.updateStreakChallenge(habit.streak + 1)
                                 }
                             },
                             onEdit = { editingHabit = habit },

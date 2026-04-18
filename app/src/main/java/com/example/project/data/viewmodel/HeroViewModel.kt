@@ -287,6 +287,37 @@ class HeroViewModel : ViewModel() {
         }
     }
 
+    fun updateStreakChallenge(newStreak: Int) {
+        val userId = auth.currentUser?.uid ?: return
+
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("users").document(userId)
+                    .collection("challenges")
+                    .whereEqualTo("completed", false)
+                    .get()
+                    .await()
+
+                for (doc in snapshot.documents) {
+                    val challenge = doc.toObject(Challenge::class.java)?.copy(id = doc.id) ?: continue
+
+                    if (challenge.title.contains("Streak", ignoreCase = true)) {
+                        if (newStreak > challenge.progress) {
+                            if (newStreak >= challenge.goal) {
+                                completeChallenge(challenge.copy(progress = newStreak))
+                            } else {
+                                doc.reference.update("progress", newStreak)
+                            }
+                        }
+                        break
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HeroVM", "Error updating streak challenge: ${e.message}")
+            }
+        }
+    }
+
     private fun runOneTimeDataMigration() {
         viewModelScope.launch {
             try {

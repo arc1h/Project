@@ -76,7 +76,8 @@ class HabitViewModel : ViewModel() {
             batch.update(habitRef, mapOf(
                 "completed" to true,
                 "lastCompleted" to System.currentTimeMillis(),
-                "streak" to newStreakValue
+                "streak" to newStreakValue,
+                "skippedCount" to 0
             ))
 
             batch.update(userRef, mapOf(

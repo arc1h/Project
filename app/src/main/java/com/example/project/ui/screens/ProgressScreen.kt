@@ -118,10 +118,7 @@ fun ProgressScreen(
     val stats by remember(habits, hero) {
         derivedStateOf {
             val bestHabit = habits.maxByOrNull { it.streak }
-
-            // Use the real-time streak from the hero listener
-            val currentGlobalRecord = hero?.longestStreak ?: 0
-            val resolvedLongestStreak = maxOf(currentGlobalRecord, bestHabit?.streak ?: 0)
+            val resolvedLongestStreak = bestHabit?.streak ?: 0
 
             val startedHabits = habits.filter { it.streak > 0 }
             val worstHabit = startedHabits.minByOrNull { it.streak }
@@ -129,7 +126,6 @@ fun ProgressScreen(
             val skippedHabit = habits.filter { it.skippedCount > 0 }.maxByOrNull { it.skippedCount }
 
             ProgressStats(
-                // Logic: Use whichever is higher—the current habit's streak or the saved record
                 longestStreakHabit = bestHabit?.name ?: "No data",
                 longestStreakDays = if (resolvedLongestStreak > 0) resolvedLongestStreak else null,
 
